@@ -136,8 +136,10 @@ namespace dxvk {
 
     bool                    m_isSrgbCompatible;
     D3D9ColorView           m_sampleView;
-    D3D9ColorView           m_renderTargetView;
-    Rc<DxvkImageView>       m_depthStencilView;
+    union {
+      D3D9ColorView           m_renderTargetView;
+      Rc<DxvkImageView>       m_depthStencilView;
+    };
 
   };
 
