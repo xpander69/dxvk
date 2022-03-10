@@ -18,6 +18,7 @@ namespace dxvk {
     m_properties        (adapter->devicePropertiesExt()),
     m_perfHints         (getPerfHints()),
     m_objects           (this),
+    m_formats           (this),
     m_submissionQueue   (this) {
     auto queueFamilies = m_adapter->findQueueFamilies();
     m_queues.graphics = getQueue(queueFamilies.graphics, 0);

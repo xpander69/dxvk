@@ -178,6 +178,16 @@ namespace dxvk {
     }
 
     /**
+     * \brief Looks up format
+     *
+     * \param [in] format Format to look up
+     * \returns Reference to format property struct
+     */
+    const DxvkFormatProperties& lookupFormat(DxvkFormat format) const {
+      return m_formats.lookup(format);
+    }
+
+    /**
      * \brief Get device status
      * 
      * This may report device loss in
@@ -507,6 +517,7 @@ namespace dxvk {
     
     DxvkDevicePerfHints         m_perfHints;
     DxvkObjects                 m_objects;
+    DxvkFormatMap               m_formats;
 
     sync::Spinlock              m_statLock;
     DxvkStatCounters            m_statCounters;
