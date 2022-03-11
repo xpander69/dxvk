@@ -159,11 +159,11 @@ namespace dxvk {
     DXGI_VK_FORMAT_INFO formatInfo = pDevice->LookupFormat(resourceDesc.Format, DXGI_VK_FORMAT_MODE_COLOR);
     DXGI_VK_FORMAT_FAMILY formatFamily = pDevice->LookupFamily(resourceDesc.Format, DXGI_VK_FORMAT_MODE_COLOR);
 
-    VkImageAspectFlags aspectMask = imageFormatInfo(formatInfo.Format)->aspectMask;
+    VkImageAspectFlags aspectMask = formatInfo.pFormat->aspectMask;
 
     DxvkImageViewCreateInfo viewInfo;
-    viewInfo.format  = formatInfo.Format;
-    viewInfo.swizzle = formatInfo.Swizzle;
+    viewInfo.format  = formatInfo.pFormat->vkFormat;
+    viewInfo.swizzle = formatInfo.pFormat->rSwizzle;
     viewInfo.usage   = VK_IMAGE_USAGE_SAMPLED_BIT;
 
     switch (m_desc.ViewDimension) {
@@ -177,6 +177,12 @@ namespace dxvk {
 
       case D3D11_RTV_DIMENSION_UNKNOWN:
         throw DxvkError("Invalid view dimension");
+    }
+
+    if (resourceDesc.Format == DXGI_FORMAT_AYUV) {
+      viewInfo.swizzle = {
+        VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_B,
+        VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_A };
     }
 
     m_subresources.aspectMask = aspectMask;
@@ -256,9 +262,9 @@ namespace dxvk {
       resourceDesc.Format, DXGI_VK_FORMAT_MODE_COLOR);
 
     DxvkImageViewCreateInfo viewInfo;
-    viewInfo.format  = formatInfo.Format;
-    viewInfo.aspect  = imageFormatInfo(viewInfo.format)->aspectMask;
-    viewInfo.swizzle = formatInfo.Swizzle;
+    viewInfo.format  = formatInfo.pFormat->vkFormat;
+    viewInfo.aspect  = formatInfo.pFormat->aspectMask;
+    viewInfo.swizzle = formatInfo.pFormat->wSwizzle;
     viewInfo.usage   = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
     switch (m_desc.ViewDimension) {

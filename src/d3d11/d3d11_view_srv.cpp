@@ -56,9 +56,8 @@ namespace dxvk {
         viewInfo.rangeOffset = buffer->Desc()->StructureByteStride * bufInfo.FirstElement;
         viewInfo.rangeLength = buffer->Desc()->StructureByteStride * bufInfo.NumElements;
       } else {
-        viewInfo.format = pDevice->LookupFormat(pDesc->Format, DXGI_VK_FORMAT_MODE_COLOR).Format;
-        
-        const DxvkFormatInfo* formatInfo = imageFormatInfo(viewInfo.format);
+        auto formatInfo = pDevice->LookupFormat(pDesc->Format, DXGI_VK_FORMAT_MODE_COLOR).pFormat;
+        viewInfo.format      = formatInfo->vkFormat;
         viewInfo.rangeOffset = formatInfo->elementSize * bufInfo.FirstElement;
         viewInfo.rangeLength = formatInfo->elementSize * bufInfo.NumElements;
       }
@@ -75,9 +74,9 @@ namespace dxvk {
       auto formatInfo = pDevice->LookupFormat(pDesc->Format, texture->GetFormatMode());
       
       DxvkImageViewCreateInfo viewInfo;
-      viewInfo.format  = formatInfo.Format;
+      viewInfo.format  = formatInfo.pFormat->vkFormat;
       viewInfo.aspect  = formatInfo.Aspect;
-      viewInfo.swizzle = formatInfo.Swizzle;
+      viewInfo.swizzle = formatInfo.pFormat->rSwizzle;
       viewInfo.usage   = VK_IMAGE_USAGE_SAMPLED_BIT;
 
       // Shaders expect the stencil value in the G component

@@ -467,9 +467,7 @@ namespace dxvk {
         return E_INVALIDARG;
     }
 
-    VkFormat packedFormat = m_parent->LookupPackedFormat(
-      pResource->Desc()->Format, pResource->GetFormatMode()).Format;
-    
+    VkFormat packedFormat = pResource->GetPackedFormat();
     uint64_t sequenceNumber = pResource->GetSequenceNumber(Subresource);
 
     auto formatInfo = imageFormatInfo(packedFormat);

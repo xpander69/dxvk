@@ -122,7 +122,7 @@ namespace dxvk {
     auto mapMode = pTexture->GetMapMode();
     auto desc = pTexture->Desc();
 
-    VkFormat packedFormat = m_parent->LookupPackedFormat(desc->Format, pTexture->GetFormatMode()).Format;
+    VkFormat packedFormat = pTexture->GetPackedFormat();
     auto formatInfo = imageFormatInfo(packedFormat);
 
     if (pInitialData != nullptr && pInitialData->pSysMem != nullptr) {

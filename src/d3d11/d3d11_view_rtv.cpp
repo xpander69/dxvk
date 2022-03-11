@@ -23,9 +23,9 @@ namespace dxvk {
       pDesc->Format, DXGI_VK_FORMAT_MODE_COLOR);
 
     DxvkImageViewCreateInfo viewInfo;
-    viewInfo.format  = formatInfo.Format;
-    viewInfo.aspect  = imageFormatInfo(viewInfo.format)->aspectMask;
-    viewInfo.swizzle = formatInfo.Swizzle;
+    viewInfo.format  = formatInfo.pFormat->vkFormat;
+    viewInfo.aspect  = formatInfo.pFormat->aspectMask;
+    viewInfo.swizzle = formatInfo.pFormat->rSwizzle; /* TODO wSwizzle */
     viewInfo.usage   = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     
     switch (pDesc->ViewDimension) {

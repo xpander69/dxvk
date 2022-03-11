@@ -400,10 +400,6 @@ namespace dxvk {
             DXGI_FORMAT           Format,
             DXGI_VK_FORMAT_MODE   Mode) const;
     
-    DXGI_VK_FORMAT_INFO LookupPackedFormat(
-            DXGI_FORMAT           Format,
-            DXGI_VK_FORMAT_MODE   Mode) const;
-    
     DXGI_VK_FORMAT_FAMILY LookupFamily(
             DXGI_FORMAT           Format,
             DXGI_VK_FORMAT_MODE   Mode) const;

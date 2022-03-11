@@ -40,7 +40,7 @@ namespace dxvk {
     m_featureFlags  (FeatureFlags),
     m_dxvkDevice    (pContainer->GetDXVKDevice()),
     m_dxvkAdapter   (m_dxvkDevice->adapter()),
-    m_d3d11Formats  (m_dxvkAdapter),
+    m_d3d11Formats  (m_dxvkDevice),
     m_d3d11Options  (m_dxvkDevice->instance()->config(), m_dxvkDevice),
     m_dxbcOptions   (m_dxvkDevice, m_d3d11Options) {
     m_initializer = new D3D11Initializer(this);
@@ -619,17 +619,18 @@ namespace dxvk {
         }
         
         // Create vertex input attribute description
+        auto formatInfo = LookupFormat(pInputElementDescs[i].Format, DXGI_VK_FORMAT_MODE_COLOR).pFormat;
+
         DxvkVertexAttribute attrib;
         attrib.location = entry != nullptr ? entry->registerId : 0;
         attrib.binding  = pInputElementDescs[i].InputSlot;
-        attrib.format   = LookupFormat(pInputElementDescs[i].Format, DXGI_VK_FORMAT_MODE_COLOR).Format;
+        attrib.format   = formatInfo->vkFormat;
         attrib.offset   = pInputElementDescs[i].AlignedByteOffset;
         
         // The application may choose to let the implementation
         // generate the exact vertex layout. In that case we'll
         // pack attributes on the same binding in the order they
         // are declared, aligning each attribute to four bytes.
-        const DxvkFormatInfo* formatInfo = imageFormatInfo(attrib.format);
         VkDeviceSize alignment = std::min<VkDeviceSize>(formatInfo->elementSize, 4);
 
         if (attrib.offset == D3D11_APPEND_ALIGNED_ELEMENT) {
@@ -1467,7 +1468,7 @@ namespace dxvk {
     }
     
     // All other unknown formats should result in an error return.
-    VkFormat format = LookupFormat(Format, DXGI_VK_FORMAT_MODE_ANY).Format;
+    VkFormat format = LookupFormat(Format, DXGI_VK_FORMAT_MODE_ANY).pFormat->vkFormat;
 
     if (format == VK_FORMAT_UNDEFINED)
       return E_INVALIDARG;
@@ -1876,13 +1877,6 @@ namespace dxvk {
   }
   
   
-  DXGI_VK_FORMAT_INFO D3D11Device::LookupPackedFormat(
-          DXGI_FORMAT           Format,
-          DXGI_VK_FORMAT_MODE   Mode) const {
-    return m_d3d11Formats.GetPackedFormatInfo(Format, Mode);
-  }
-  
-  
   DXGI_VK_FORMAT_FAMILY D3D11Device::LookupFamily(
           DXGI_FORMAT           Format,
           DXGI_VK_FORMAT_MODE   Mode) const {
@@ -2042,21 +2036,16 @@ namespace dxvk {
     if (pFlags2 != nullptr) *pFlags2 = 0;
 
     // Unsupported or invalid format
-    if (Format != DXGI_FORMAT_UNKNOWN && fmtMapping.Format == VK_FORMAT_UNDEFINED)
+    if (Format != DXGI_FORMAT_UNKNOWN && fmtMapping.pFormat->vkFormat == VK_FORMAT_UNDEFINED)
       return E_FAIL;
     
     // Query Vulkan format properties and supported features for it
-    const DxvkFormatInfo* fmtProperties = imageFormatInfo(fmtMapping.Format);
-
-    VkFormatProperties fmtSupport = fmtMapping.Format != VK_FORMAT_UNDEFINED
-      ? m_dxvkAdapter->formatProperties(fmtMapping.Format)
-      : VkFormatProperties();
-    
+    VkFormatProperties   fmtSupport  = fmtMapping.pFormat->support;
     VkFormatFeatureFlags bufFeatures = fmtSupport.bufferFeatures;
     VkFormatFeatureFlags imgFeatures = fmtSupport.optimalTilingFeatures | fmtSupport.linearTilingFeatures;
 
     // For multi-plane images, we want to check available view formats as well
-    if (fmtProperties->flags.test(DxvkFormatFlag::MultiPlane)) {
+    if (fmtMapping.pFormat->isMultiPlane()) {
       const VkFormatFeatureFlags featureMask
         = VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT
         | VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT
@@ -2109,11 +2098,11 @@ namespace dxvk {
     
     if (imgFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT
      || imgFeatures & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT) {
-      const VkFormat depthFormat = LookupFormat(Format, DXGI_VK_FORMAT_MODE_DEPTH).Format;
+      const VkFormat depthFormat = LookupFormat(Format, DXGI_VK_FORMAT_MODE_DEPTH).pFormat->vkFormat;
       
-      if (GetImageTypeSupport(fmtMapping.Format, VK_IMAGE_TYPE_1D)) flags1 |= D3D11_FORMAT_SUPPORT_TEXTURE1D;
-      if (GetImageTypeSupport(fmtMapping.Format, VK_IMAGE_TYPE_2D)) flags1 |= D3D11_FORMAT_SUPPORT_TEXTURE2D;
-      if (GetImageTypeSupport(fmtMapping.Format, VK_IMAGE_TYPE_3D)) flags1 |= D3D11_FORMAT_SUPPORT_TEXTURE3D;
+      if (GetImageTypeSupport(fmtMapping.pFormat->vkFormat, VK_IMAGE_TYPE_1D)) flags1 |= D3D11_FORMAT_SUPPORT_TEXTURE1D;
+      if (GetImageTypeSupport(fmtMapping.pFormat->vkFormat, VK_IMAGE_TYPE_2D)) flags1 |= D3D11_FORMAT_SUPPORT_TEXTURE2D;
+      if (GetImageTypeSupport(fmtMapping.pFormat->vkFormat, VK_IMAGE_TYPE_3D)) flags1 |= D3D11_FORMAT_SUPPORT_TEXTURE3D;
       
       flags1 |= D3D11_FORMAT_SUPPORT_MIP
              |  D3D11_FORMAT_SUPPORT_CAST_WITHIN_BIT_LAYOUT;
@@ -2163,9 +2152,9 @@ namespace dxvk {
       // Query multisample support for this format
       VkImageFormatProperties imgFmtProperties;
       
-      VkResult status = m_dxvkAdapter->imageFormatProperties(fmtMapping.Format,
-        VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
-        (fmtProperties->aspectMask & VK_IMAGE_ASPECT_COLOR_BIT)
+      VkResult status = m_dxvkAdapter->imageFormatProperties(
+        fmtMapping.pFormat->vkFormat, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
+        (fmtMapping.pFormat->aspectMask & VK_IMAGE_ASPECT_COLOR_BIT)
           ? VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
           : VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
         0, imgFmtProperties);
@@ -2250,7 +2239,7 @@ namespace dxvk {
     auto viewFormat   = LookupFormat(ViewFormat, formatMode);
 
     for (uint32_t i = 0; i < formatFamily.FormatCount; i++) {
-      if (formatFamily.Formats[i] == viewFormat.Format)
+      if (formatFamily.Formats[i] == viewFormat.pFormat->vkFormat)
         return i % planeCount;
     }
 
@@ -2334,10 +2323,7 @@ namespace dxvk {
       return;
 
     // Retrieve image format information
-    VkFormat packedFormat = LookupPackedFormat(
-      texture->Desc()->Format,
-      texture->GetFormatMode()).Format;
-    
+    VkFormat packedFormat = texture->GetPackedFormat();
     auto formatInfo = imageFormatInfo(packedFormat);
     
     // Validate box against subresource dimensions

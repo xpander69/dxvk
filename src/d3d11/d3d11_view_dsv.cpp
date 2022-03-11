@@ -17,9 +17,12 @@ namespace dxvk {
     D3D11_COMMON_RESOURCE_DESC resourceDesc;
     GetCommonResourceDesc(pResource, &resourceDesc);
 
+    DXGI_VK_FORMAT_INFO formatInfo = pDevice->LookupFormat(
+      pDesc->Format, DXGI_VK_FORMAT_MODE_DEPTH);
+
     DxvkImageViewCreateInfo viewInfo;
-    viewInfo.format = pDevice->LookupFormat(pDesc->Format, DXGI_VK_FORMAT_MODE_DEPTH).Format;
-    viewInfo.aspect = imageFormatInfo(viewInfo.format)->aspectMask;
+    viewInfo.format = formatInfo.pFormat->vkFormat;
+    viewInfo.aspect = formatInfo.pFormat->aspectMask;
     viewInfo.usage  = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
     
     switch (pDesc->ViewDimension) {

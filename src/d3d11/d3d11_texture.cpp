@@ -18,12 +18,11 @@ namespace dxvk {
     DXGI_VK_FORMAT_MODE   formatMode   = GetFormatMode();
     DXGI_VK_FORMAT_INFO   formatInfo   = m_device->LookupFormat(m_desc.Format, formatMode);
     DXGI_VK_FORMAT_FAMILY formatFamily = m_device->LookupFamily(m_desc.Format, formatMode);
-    DXGI_VK_FORMAT_INFO   formatPacked = m_device->LookupPackedFormat(m_desc.Format, formatMode);
-    m_packedFormat = formatPacked.Format;
+    m_packedFormat = formatInfo.pFormat->vkFormat;
 
     DxvkImageCreateInfo imageInfo;
     imageInfo.type            = GetVkImageType();
-    imageInfo.format          = formatInfo.Format;
+    imageInfo.format          = formatInfo.pFormat->vkFormat;
     imageInfo.flags           = 0;
     imageInfo.sampleCount     = VK_SAMPLE_COUNT_1_BIT;
     imageInfo.extent.width    = m_desc.Width;
@@ -67,17 +66,17 @@ namespace dxvk {
       DXGI_VK_FORMAT_INFO formatBase = m_device->LookupFormat(
         m_desc.Format, DXGI_VK_FORMAT_MODE_RAW);
 
-      if (formatBase.Format != formatInfo.Format
-       && formatBase.Format != VK_FORMAT_UNDEFINED) {
-        formatFamily.Add(formatBase.Format);
-        formatFamily.Add(formatInfo.Format);
+      if (formatBase.pFormat->vkFormat != formatInfo.pFormat->vkFormat
+       && formatBase.pFormat->vkFormat != VK_FORMAT_UNDEFINED) {
+        formatFamily.Add(formatBase.pFormat->vkFormat);
+        formatFamily.Add(formatInfo.pFormat->vkFormat);
       }
     }
 
     // The image must be marked as mutable if it can be reinterpreted
     // by a view with a different format. Depth-stencil formats cannot
     // be reinterpreted in Vulkan, so we'll ignore those.
-    auto formatProperties = imageFormatInfo(formatInfo.Format);
+    auto formatProperties = formatInfo.pFormat;
     
     bool isTypeless = formatInfo.Aspect == 0;
     bool isMutable = formatFamily.FormatCount > 1;
@@ -124,7 +123,7 @@ namespace dxvk {
 
       // UAVs are not supported for sRGB formats on most drivers,
       // but we can still create linear views for the image
-      if (formatProperties->flags.test(DxvkFormatFlag::ColorSpaceSrgb))
+      if (formatProperties->type == DxvkFormatType::Srgb)
         imageInfo.flags |= VK_IMAGE_CREATE_EXTENDED_USAGE_BIT;
     }
 
@@ -358,9 +357,9 @@ namespace dxvk {
       return false;
 
     // Check whether the view format is compatible
-    DXGI_VK_FORMAT_MODE formatMode = GetFormatMode();
-    DXGI_VK_FORMAT_INFO viewFormat = m_device->LookupFormat(Format,        formatMode);
-    DXGI_VK_FORMAT_INFO baseFormat = m_device->LookupFormat(m_desc.Format, formatMode);
+    auto formatMode = GetFormatMode();
+    auto viewFormat = m_device->LookupFormat(Format,        formatMode).pFormat;
+    auto baseFormat = m_device->LookupFormat(m_desc.Format, formatMode).pFormat;
     
     // Check whether the plane index is valid for the given format
     uint32_t planeCount = GetPlaneCount();
@@ -373,36 +372,34 @@ namespace dxvk {
       // view type and view format is actually supported
       VkFormatFeatureFlags features = GetImageFormatFeatures(BindFlags);
       
-      if (!CheckFormatFeatureSupport(viewFormat.Format, features))
+      if ((viewFormat->support.optimalTilingFeatures & features) != features
+       && (viewFormat->support.linearTilingFeatures  & features) != features)
         return false;
 
       // Using the image format itself is supported for non-planar formats
-      if (viewFormat.Format == baseFormat.Format && planeCount == 1)
+      if (viewFormat->vkFormat == baseFormat->vkFormat && planeCount == 1)
         return true;
       
       // If there is a list of compatible formats, the view format must be
       // included in that list. For planar formats, the list is laid out in
       // such a way that the n-th format is supported for the n-th plane. 
       for (size_t i = Plane; i < imageInfo.viewFormatCount; i += planeCount) {
-        if (imageInfo.viewFormats[i] == viewFormat.Format) {
+        if (imageInfo.viewFormats[i] == viewFormat->vkFormat) {
           return true;
         }
       }
 
       // Otherwise, all bit-compatible formats can be used.
       if (imageInfo.viewFormatCount == 0 && planeCount == 1) {
-        auto baseFormatInfo = imageFormatInfo(baseFormat.Format);
-        auto viewFormatInfo = imageFormatInfo(viewFormat.Format);
-        
-        return baseFormatInfo->aspectMask  == viewFormatInfo->aspectMask
-            && baseFormatInfo->elementSize == viewFormatInfo->elementSize;
+        return baseFormat->aspectMask  == viewFormat->aspectMask
+            && baseFormat->elementSize == viewFormat->elementSize;
       }
 
       return false;
     } else {
       // For non-mutable images, the view format
       // must be identical to the image format.
-      return viewFormat.Format == baseFormat.Format && planeCount == 1;
+      return viewFormat->vkFormat == baseFormat->vkFormat && planeCount == 1;
     }
   }
   
@@ -480,16 +477,6 @@ namespace dxvk {
   }
 
 
-  BOOL D3D11CommonTexture::CheckFormatFeatureSupport(
-          VkFormat              Format,
-          VkFormatFeatureFlags  Features) const {
-    VkFormatProperties properties = m_device->GetDXVKDevice()->adapter()->formatProperties(Format);
-
-    return (properties.linearTilingFeatures  & Features) == Features
-        || (properties.optimalTilingFeatures & Features) == Features;
-  }
-  
-  
   VkImageUsageFlags D3D11CommonTexture::EnableMetaCopyUsage(
           VkFormat              Format,
           VkImageTiling         Tiling) const {
@@ -645,11 +632,10 @@ namespace dxvk {
   
   
   D3D11CommonTexture::MappedBuffer D3D11CommonTexture::CreateMappedBuffer(UINT MipLevel) const {
-    const DxvkFormatInfo* formatInfo = imageFormatInfo(
-      m_device->LookupPackedFormat(m_desc.Format, GetFormatMode()).Format);
+    DXGI_VK_FORMAT_INFO formatInfo = m_device->LookupFormat(m_desc.Format, GetFormatMode());
     
     DxvkBufferCreateInfo info;
-    info.size   = GetSubresourceLayout(formatInfo->aspectMask, MipLevel).Size;
+    info.size   = GetSubresourceLayout(formatInfo.pFormat->aspectMask, MipLevel).Size;
     info.usage  = VK_BUFFER_USAGE_TRANSFER_SRC_BIT
                 | VK_BUFFER_USAGE_TRANSFER_DST_BIT
                 | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT

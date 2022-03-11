@@ -2,7 +2,7 @@
 
 #include "dxgi_include.h"
 
-#include "../dxvk/dxvk_adapter.h"
+#include "../dxvk/dxvk_device.h"
 #include "../dxvk/dxvk_format.h"
 
 namespace dxvk {
@@ -13,14 +13,11 @@ namespace dxvk {
    * Maps a DXGI format to a set of Vulkan formats.
    */
   struct DXGI_VK_FORMAT_MAPPING {
-    VkFormat              FormatColor   = VK_FORMAT_UNDEFINED;  ///< Corresponding color format
-    VkFormat              FormatDepth   = VK_FORMAT_UNDEFINED;  ///< Corresponding depth format
-    VkFormat              FormatRaw     = VK_FORMAT_UNDEFINED;  ///< Bit-compatible integer format
-    VkImageAspectFlags    AspectColor   = 0;                    ///< Defined aspects for the color format
-    VkImageAspectFlags    AspectDepth   = 0;                    ///< Defined aspects for the depth format
-    VkComponentMapping    Swizzle       = {                     ///< Color component swizzle
-      VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
-      VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
+    DxvkFormat                  FormatColor   = DxvkFormat::Unknown;  ///< Corresponding color format
+    DxvkFormat                  FormatDepth   = DxvkFormat::Unknown;  ///< Corresponding depth format
+    DxvkFormat                  FormatRaw     = DxvkFormat::Unknown;  ///< Bit-compatible integer format
+    VkImageAspectFlags          AspectColor   = 0;                    ///< Defined aspects for the color format
+    VkImageAspectFlags          AspectDepth   = 0;                    ///< Defined aspects for the depth format
   };
   
   /**
@@ -32,11 +29,8 @@ namespace dxvk {
    * are supposed to be used.
    */
   struct DXGI_VK_FORMAT_INFO {
-    VkFormat              Format      = VK_FORMAT_UNDEFINED;  ///< Corresponding color format
-    VkImageAspectFlags    Aspect      = 0;                    ///< Defined image aspect mask
-    VkComponentMapping    Swizzle     = {                     ///< Component swizzle
-      VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
-      VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
+    const DxvkFormatProperties* pFormat     = nullptr;              ///< Format properties
+    VkImageAspectFlags          Aspect      = 0;                    ///< Defined image aspect mask
   };
   
   /**
@@ -96,13 +90,12 @@ namespace dxvk {
    * formats.
    */
   class DXGIVkFormatTable {
-    
+
   public:
-    
-    DXGIVkFormatTable(
-      const Rc<DxvkAdapter>& adapter);
+
+    DXGIVkFormatTable(const Rc<DxvkDevice>& Device);
     ~DXGIVkFormatTable();
-    
+
     /**
      * \brief Retrieves info for a given DXGI format
      * 
@@ -113,21 +106,7 @@ namespace dxvk {
     DXGI_VK_FORMAT_INFO GetFormatInfo(
             DXGI_FORMAT         Format,
             DXGI_VK_FORMAT_MODE Mode) const;
-    
-    /**
-     * \brief Retrieves original info for a given DXGI format
-     * 
-     * Doesn't perform any format adjustment, so this
-     * can be used to determine the packed data format
-     * of a DXGI format for things like data uploads.
-     * \param [in] Format The DXGI format to look up
-     * \param [in] Mode the format lookup mode
-     * \returns Format info
-     */
-    DXGI_VK_FORMAT_INFO GetPackedFormatInfo(
-            DXGI_FORMAT         Format,
-            DXGI_VK_FORMAT_MODE Mode) const;
-    
+
     /**
      * \brief Retrieves a format family
      * 
@@ -140,33 +119,18 @@ namespace dxvk {
             DXGI_VK_FORMAT_MODE Mode) const;
     
   private:
-    
-    std::array<DXGI_VK_FORMAT_MAPPING, 133> m_dxgiFormats;
-    std::array<DXGI_VK_FORMAT_FAMILY,  133> m_dxgiFamilies;
+
+    Rc<DxvkDevice> m_device;
 
     DXGI_VK_FORMAT_INFO GetFormatInfoFromMapping(
       const DXGI_VK_FORMAT_MAPPING* pMapping,
             DXGI_VK_FORMAT_MODE   Mode) const;
-    
+
     const DXGI_VK_FORMAT_MAPPING* GetFormatMapping(
             DXGI_FORMAT           Format) const;
 
     const DXGI_VK_FORMAT_MAPPING* GetPackedFormatMapping(
             DXGI_FORMAT           Format) const;
-
-    bool CheckImageFormatSupport(
-      const Rc<DxvkAdapter>&      Adapter,
-            VkFormat              Format,
-            VkFormatFeatureFlags  Features) const;
-    
-    void RemapDepthFormat(
-            DXGI_FORMAT           Format,
-            VkFormat              Target);
-        
-    void RemapColorFormat(
-            DXGI_FORMAT           Format,
-            VkFormat              Target,
-            VkComponentMapping    Swizzle);
 
   };
   

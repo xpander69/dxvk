@@ -155,10 +155,6 @@ namespace dxvk {
     D3D11DXGIResource             m_resource;
     D3D10Buffer                   m_d3d10;
 
-    BOOL CheckFormatFeatureSupport(
-            VkFormat              Format,
-            VkFormatFeatureFlags  Features) const;
-    
     VkMemoryPropertyFlags GetMemoryFlags() const;
 
     Rc<DxvkBuffer> CreateSoCounterBuffer();

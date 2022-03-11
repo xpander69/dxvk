@@ -569,8 +569,8 @@ namespace dxvk {
     D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc;
     uav->GetDesc(&uavDesc);
     
-    VkFormat uavFormat = m_parent->LookupFormat(uavDesc.Format, DXGI_VK_FORMAT_MODE_ANY).Format;
-    VkFormat rawFormat = m_parent->LookupFormat(uavDesc.Format, DXGI_VK_FORMAT_MODE_RAW).Format;
+    VkFormat uavFormat = m_parent->LookupFormat(uavDesc.Format, DXGI_VK_FORMAT_MODE_ANY).pFormat->vkFormat;
+    VkFormat rawFormat = m_parent->LookupFormat(uavDesc.Format, DXGI_VK_FORMAT_MODE_RAW).pFormat->vkFormat;
     
     if (uavFormat != rawFormat && rawFormat == VK_FORMAT_UNDEFINED) {
       Logger::err(str::format("D3D11: ClearUnorderedAccessViewUint: No raw format found for ", uavFormat));
@@ -1010,11 +1010,8 @@ namespace dxvk {
     D3D11CommonTexture* dstTextureInfo = GetCommonTexture(pDstResource);
     D3D11CommonTexture* srcTextureInfo = GetCommonTexture(pSrcResource);
     
-    const DXGI_VK_FORMAT_INFO dstFormatInfo = m_parent->LookupFormat(dstDesc.Format, DXGI_VK_FORMAT_MODE_ANY);
-    const DXGI_VK_FORMAT_INFO srcFormatInfo = m_parent->LookupFormat(srcDesc.Format, DXGI_VK_FORMAT_MODE_ANY);
-    
-    auto dstVulkanFormatInfo = imageFormatInfo(dstFormatInfo.Format);
-    auto srcVulkanFormatInfo = imageFormatInfo(srcFormatInfo.Format);
+    auto dstFormatInfo = m_parent->LookupFormat(dstDesc.Format, DXGI_VK_FORMAT_MODE_ANY);
+    auto srcFormatInfo = m_parent->LookupFormat(srcDesc.Format, DXGI_VK_FORMAT_MODE_ANY);
     
     if (DstSubresource >= dstTextureInfo->CountSubresources()
      || SrcSubresource >= srcTextureInfo->CountSubresources())
@@ -1022,11 +1019,11 @@ namespace dxvk {
     
     const VkImageSubresource dstSubresource =
       dstTextureInfo->GetSubresourceFromIndex(
-        dstVulkanFormatInfo->aspectMask, DstSubresource);
+        dstFormatInfo.pFormat->aspectMask, DstSubresource);
     
     const VkImageSubresource srcSubresource =
       srcTextureInfo->GetSubresourceFromIndex(
-        srcVulkanFormatInfo->aspectMask, SrcSubresource);
+        srcFormatInfo.pFormat->aspectMask, SrcSubresource);
     
     const VkImageSubresourceLayers dstSubresourceLayers = {
       dstSubresource.aspectMask,
@@ -1052,7 +1049,7 @@ namespace dxvk {
       });
     } else {
       const VkFormat format = m_parent->LookupFormat(
-        Format, DXGI_VK_FORMAT_MODE_ANY).Format;
+        Format, DXGI_VK_FORMAT_MODE_ANY).pFormat->vkFormat;
       
       EmitCs([
         cDstImage  = dstTextureInfo->GetImage(),

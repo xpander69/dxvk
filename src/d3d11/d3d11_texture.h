@@ -403,10 +403,6 @@ namespace dxvk {
       const DxvkImageCreateInfo*  pImageInfo,
             VkImageTiling         Tiling) const;
     
-    BOOL CheckFormatFeatureSupport(
-            VkFormat              Format,
-            VkFormatFeatureFlags  Features) const;
-    
     VkImageUsageFlags EnableMetaCopyUsage(
             VkFormat              Format,
             VkImageTiling         Tiling) const;
