@@ -401,8 +401,7 @@ namespace dxvk {
             DXGI_VK_FORMAT_MODE   Mode) const;
     
     DXGI_VK_FORMAT_FAMILY LookupFamily(
-            DXGI_FORMAT           Format,
-            DXGI_VK_FORMAT_MODE   Mode) const;
+            DXGI_FORMAT           Format) const;
     
     DxvkCsChunkRef AllocCsChunk(DxvkCsChunkFlags flags) {
       DxvkCsChunk* chunk = m_csChunkPool.allocChunk(flags);

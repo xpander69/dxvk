@@ -17,7 +17,7 @@ namespace dxvk {
   : m_interface(pInterface), m_device(pDevice), m_dimension(Dimension), m_desc(*pDesc), m_dxgiUsage(DxgiUsage) {
     DXGI_VK_FORMAT_MODE   formatMode   = GetFormatMode();
     DXGI_VK_FORMAT_INFO   formatInfo   = m_device->LookupFormat(m_desc.Format, formatMode);
-    DXGI_VK_FORMAT_FAMILY formatFamily = m_device->LookupFamily(m_desc.Format, formatMode);
+    DXGI_VK_FORMAT_FAMILY formatFamily = m_device->LookupFamily(m_desc.Format);
     m_packedFormat = formatInfo.pFormat->vkFormat;
 
     DxvkImageCreateInfo imageInfo;
@@ -62,14 +62,23 @@ namespace dxvk {
     // Integer clear operations on UAVs are implemented using
     // a view with a bit-compatible integer format, so we'll
     // have to include that format in the format family
-    if (m_desc.BindFlags & D3D11_BIND_UNORDERED_ACCESS) {
-      DXGI_VK_FORMAT_INFO formatBase = m_device->LookupFormat(
-        m_desc.Format, DXGI_VK_FORMAT_MODE_RAW);
+    DxvkVulkanFormatList formatList = { formatInfo.pFormat->vkFormat };
 
-      if (formatBase.pFormat->vkFormat != formatInfo.pFormat->vkFormat
-       && formatBase.pFormat->vkFormat != VK_FORMAT_UNDEFINED) {
-        formatFamily.Add(formatBase.pFormat->vkFormat);
-        formatFamily.Add(formatInfo.pFormat->vkFormat);
+    for (uint32_t i = 0; i < formatFamily.count(); i++) {
+      DXGI_VK_FORMAT_INFO viewFormatInfo = m_device->LookupFormat(m_desc.Format, formatMode);
+      formatList.add(viewFormatInfo.pFormat->vkFormat);
+    }
+
+    if (m_desc.BindFlags & D3D11_BIND_UNORDERED_ACCESS) {
+      DXGI_VK_FORMAT_INFO rawFormatInfo = m_device->LookupFormat(m_desc.Format, DXGI_VK_FORMAT_MODE_RAW);
+
+      if (rawFormatInfo.pFormat->format != DxvkFormat::Unknown)
+        formatList.add(rawFormatInfo.pFormat->vkFormat);
+
+      if (IsR32UavCompatibleFormat(m_desc.Format)) {
+        formatList.add(VK_FORMAT_R32_SFLOAT);
+        formatList.add(VK_FORMAT_R32_UINT);
+        formatList.add(VK_FORMAT_R32_SINT);
       }
     }
 
@@ -78,19 +87,14 @@ namespace dxvk {
     // be reinterpreted in Vulkan, so we'll ignore those.
     auto formatProperties = formatInfo.pFormat;
     
-    bool isTypeless = formatInfo.Aspect == 0;
-    bool isMutable = formatFamily.FormatCount > 1;
+    bool isMutable = formatList.count() > 1;
     bool isMultiPlane = (formatProperties->aspectMask & VK_IMAGE_ASPECT_PLANE_0_BIT) != 0;
     bool isColorFormat = (formatProperties->aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) != 0;
 
     if (isMutable && (isColorFormat || isMultiPlane)) {
       imageInfo.flags |= VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
-
-      // Typeless UAV images have relaxed reinterpretation rules
-      if (!isTypeless || !(m_desc.BindFlags & D3D11_BIND_UNORDERED_ACCESS)) {
-        imageInfo.viewFormatCount = formatFamily.FormatCount;
-        imageInfo.viewFormats     = formatFamily.Formats;
-      }
+      imageInfo.viewFormatCount = formatList.count();
+      imageInfo.viewFormats     = formatList.formats();
     }
 
     // Adjust image flags based on the corresponding D3D flags
@@ -350,57 +354,32 @@ namespace dxvk {
 
 
   bool D3D11CommonTexture::CheckViewCompatibility(UINT BindFlags, DXGI_FORMAT Format, UINT Plane) const {
-    const DxvkImageCreateInfo& imageInfo = m_image->info();
-
     // Check whether the given bind flags are supported
     if ((m_desc.BindFlags & BindFlags) != BindFlags)
       return false;
 
-    // Check whether the view format is compatible
-    auto formatMode = GetFormatMode();
-    auto viewFormat = m_device->LookupFormat(Format,        formatMode).pFormat;
-    auto baseFormat = m_device->LookupFormat(m_desc.Format, formatMode).pFormat;
-    
     // Check whether the plane index is valid for the given format
     uint32_t planeCount = GetPlaneCount();
 
     if (Plane >= planeCount)
       return false;
 
-    if (imageInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) {
-      // Check whether the given combination of image
-      // view type and view format is actually supported
-      VkFormatFeatureFlags features = GetImageFormatFeatures(BindFlags);
-      
-      if ((viewFormat->support.optimalTilingFeatures & features) != features
-       && (viewFormat->support.linearTilingFeatures  & features) != features)
-        return false;
-
-      // Using the image format itself is supported for non-planar formats
-      if (viewFormat->vkFormat == baseFormat->vkFormat && planeCount == 1)
+    // Check whether the view format is contained
+    // in the format list for the given plane.
+    auto formatFamily = m_device->LookupFamily(m_desc.Format);
+    
+    for (uint32_t i = 0; i < formatFamily.count(); i += planeCount) {
+      if (formatFamily[i] == Format)
         return true;
-      
-      // If there is a list of compatible formats, the view format must be
-      // included in that list. For planar formats, the list is laid out in
-      // such a way that the n-th format is supported for the n-th plane. 
-      for (size_t i = Plane; i < imageInfo.viewFormatCount; i += planeCount) {
-        if (imageInfo.viewFormats[i] == viewFormat->vkFormat) {
-          return true;
-        }
-      }
-
-      // Otherwise, all bit-compatible formats can be used.
-      if (imageInfo.viewFormatCount == 0 && planeCount == 1) {
-        return baseFormat->aspectMask  == viewFormat->aspectMask
-            && baseFormat->elementSize == viewFormat->elementSize;
-      }
-
-      return false;
-    } else {
-      // For non-mutable images, the view format
-      // must be identical to the image format.
-      return viewFormat->vkFormat == baseFormat->vkFormat && planeCount == 1;
     }
+
+    // Check whether the view format is a valid UAV format
+    if (BindFlags & D3D11_BIND_UNORDERED_ACCESS) {
+      return IsR32UavFormat(Format)
+          && IsR32UavCompatibleFormat(m_desc.Format);
+    }
+
+    return false;
   }
   
   
@@ -631,6 +610,23 @@ namespace dxvk {
   }
   
   
+  BOOL D3D11CommonTexture::IsR32UavFormat(DXGI_FORMAT Format) {
+    return Format == DXGI_FORMAT_R32_FLOAT
+        || Format == DXGI_FORMAT_R32_UINT
+        || Format == DXGI_FORMAT_R32_SINT;
+  }
+
+
+  BOOL D3D11CommonTexture::IsR32UavCompatibleFormat(DXGI_FORMAT Format) {
+    return Format == DXGI_FORMAT_R10G10B10A2_TYPELESS
+        || Format == DXGI_FORMAT_R8G8B8A8_TYPELESS
+        || Format == DXGI_FORMAT_B8G8R8A8_TYPELESS
+        || Format == DXGI_FORMAT_B8G8R8X8_TYPELESS
+        || Format == DXGI_FORMAT_R16G16_TYPELESS
+        || Format == DXGI_FORMAT_R32_TYPELESS;
+  }
+
+
   D3D11CommonTexture::MappedBuffer D3D11CommonTexture::CreateMappedBuffer(UINT MipLevel) const {
     DXGI_VK_FORMAT_INFO formatInfo = m_device->LookupFormat(m_desc.Format, GetFormatMode());
     

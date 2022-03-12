@@ -157,7 +157,7 @@ namespace dxvk {
     }
 
     DXGI_VK_FORMAT_INFO formatInfo = pDevice->LookupFormat(resourceDesc.Format, DXGI_VK_FORMAT_MODE_COLOR);
-    DXGI_VK_FORMAT_FAMILY formatFamily = pDevice->LookupFamily(resourceDesc.Format, DXGI_VK_FORMAT_MODE_COLOR);
+    DXGI_VK_FORMAT_FAMILY formatFamily = pDevice->LookupFamily(resourceDesc.Format);
 
     VkImageAspectFlags aspectMask = formatInfo.pFormat->aspectMask;
 
@@ -193,8 +193,10 @@ namespace dxvk {
     for (uint32_t i = 0; aspectMask && i < m_views.size(); i++) {
       viewInfo.aspect = vk::getNextAspect(aspectMask);
 
-      if (viewInfo.aspect != VK_IMAGE_ASPECT_COLOR_BIT)
-        viewInfo.format = formatFamily.Formats[i];
+      if (viewInfo.aspect != VK_IMAGE_ASPECT_COLOR_BIT) {
+        DXGI_VK_FORMAT_INFO viewFormatInfo = pDevice->LookupFormat(formatFamily[i], DXGI_VK_FORMAT_MODE_COLOR);
+        viewInfo.format = viewFormatInfo.pFormat->vkFormat;
+      }
 
       m_views[i] = pDevice->GetDXVKDevice()->createImageView(dxvkImage, viewInfo);
     }

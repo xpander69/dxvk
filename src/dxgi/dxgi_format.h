@@ -56,30 +56,7 @@ namespace dxvk {
    * be used to aggregate formats for the image
    * format list extension.
    */
-  struct DXGI_VK_FORMAT_FAMILY {
-    constexpr static size_t MaxSize = 8;
-
-    DXGI_VK_FORMAT_FAMILY() { }
-    DXGI_VK_FORMAT_FAMILY(const std::initializer_list<VkFormat>& FormatList) {
-      for (VkFormat f : FormatList)
-        Add(f);
-    }
-
-    BOOL Add(VkFormat Format) {
-      for (UINT i = 0; i < FormatCount; i++) {
-        if (Formats[i] == Format)
-          return TRUE;
-      }
-
-      if (FormatCount < MaxSize) {
-        Formats[FormatCount++] = Format;
-        return TRUE;
-      } return FALSE;
-    }
-
-    UINT     FormatCount = 0;
-    VkFormat Formats[MaxSize];
-  };
+  using DXGI_VK_FORMAT_FAMILY = DxvkTypedFormatList<DXGI_FORMAT>;
   
   
   /**
@@ -111,12 +88,10 @@ namespace dxvk {
      * \brief Retrieves a format family
      * 
      * \param [in] Format The format to query
-     * \param [in] Mode Image format mode
      * \returns Image format family
      */
     DXGI_VK_FORMAT_FAMILY GetFormatFamily(
-            DXGI_FORMAT         Format,
-            DXGI_VK_FORMAT_MODE Mode) const;
+            DXGI_FORMAT         Format) const;
     
   private:
 
@@ -134,4 +109,4 @@ namespace dxvk {
 
   };
   
-};
+}

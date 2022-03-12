@@ -1878,9 +1878,8 @@ namespace dxvk {
   
   
   DXGI_VK_FORMAT_FAMILY D3D11Device::LookupFamily(
-          DXGI_FORMAT           Format,
-          DXGI_VK_FORMAT_MODE   Mode) const {
-    return m_d3d11Formats.GetFormatFamily(Format, Mode);
+          DXGI_FORMAT           Format) const {
+    return m_d3d11Formats.GetFormatFamily(Format);
   }
   
   
@@ -2053,10 +2052,10 @@ namespace dxvk {
         | VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT
         | VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
 
-      DXGI_VK_FORMAT_FAMILY formatFamily = LookupFamily(Format, DXGI_VK_FORMAT_MODE_ANY);
+      DXGI_VK_FORMAT_FAMILY formatFamily = LookupFamily(Format);
 
-      for (uint32_t i = 0; i < formatFamily.FormatCount; i++) {
-        VkFormatProperties viewFmtSupport = m_dxvkAdapter->formatProperties(formatFamily.Formats[i]);
+      for (uint32_t i = 0; i < formatFamily.count(); i++) {
+        VkFormatProperties viewFmtSupport = LookupFormat(formatFamily[i], DXGI_VK_FORMAT_MODE_ANY).pFormat->support;
         imgFeatures |= (viewFmtSupport.optimalTilingFeatures | viewFmtSupport.linearTilingFeatures) & featureMask;
       }
     }
@@ -2234,12 +2233,10 @@ namespace dxvk {
     if (planeCount == 1)
       return 0;
 
-    auto formatMode   = texture->GetFormatMode();
-    auto formatFamily = LookupFamily(texture->Desc()->Format, formatMode);
-    auto viewFormat   = LookupFormat(ViewFormat, formatMode);
+    auto formatFamily = LookupFamily(texture->Desc()->Format);
 
-    for (uint32_t i = 0; i < formatFamily.FormatCount; i++) {
-      if (formatFamily.Formats[i] == viewFormat.pFormat->vkFormat)
+    for (uint32_t i = 0; i < formatFamily.count(); i++) {
+      if (ViewFormat == formatFamily[i])
         return i % planeCount;
     }
 
