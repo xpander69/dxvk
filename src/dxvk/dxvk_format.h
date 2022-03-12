@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <initializer_list>
 
 #include "dxvk_include.h"
 
@@ -235,6 +236,66 @@ namespace dxvk {
 
   };
 
+
+  /**
+   * \brief Image format list
+   *
+   * Small container that stores unique formats of
+   * the given kind. Supports arbitrary format types.
+   */
+  template<typename T>
+  class DxvkTypedFormatList {
+
+  public:
+
+    DxvkTypedFormatList() { }
+    DxvkTypedFormatList(const std::initializer_list<T>& formats) {
+      for (auto f : formats)
+        add(f);
+    }
+
+    bool add(T format) {
+      if (contains(format))
+        return true;
+
+      if (m_count < m_formats.size()) {
+        m_formats[m_count++] = format;
+        return true;
+      }
+
+      return false;
+    }
+
+    uint32_t count() const {
+      return m_count;
+    }
+
+    const T* formats() const {
+      return m_formats.data();
+    }
+
+    bool contains(T format) const {
+      for (uint32_t i = 0; i < m_count; i++) {
+        if (m_formats[i] == format)
+          return true;
+      }
+
+      return false;
+    }
+
+    T operator [] (uint32_t idx) const {
+      return m_formats[idx];
+    }
+
+  private:
+
+    uint32_t          m_count = 0;
+    std::array<T, 15> m_formats;
+
+  };
+
+  using DxvkFormatList = DxvkTypedFormatList<DxvkFormat>;
+  using DxvkVulkanFormatList = DxvkTypedFormatList<VkFormat>;
 
   /**
    * \brief Format info structure
