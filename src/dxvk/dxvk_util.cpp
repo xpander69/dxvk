@@ -22,7 +22,26 @@ namespace dxvk::util {
       result |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     return result;
   }
-  
+
+
+  VkShaderStageFlags shaderStages(
+          VkPipelineStageFlags pipelineStages) {
+    VkShaderStageFlags result = 0;
+    if (pipelineStages & VK_PIPELINE_STAGE_VERTEX_SHADER_BIT)
+      result |= VK_SHADER_STAGE_VERTEX_BIT;
+    if (pipelineStages & VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT)
+      result |= VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+    if (pipelineStages & VK_PIPELINE_STAGE_TESSELLATION_EVALUATION_SHADER_BIT)
+      result |= VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+    if (pipelineStages & VK_PIPELINE_STAGE_GEOMETRY_SHADER_BIT)
+      result |= VK_SHADER_STAGE_GEOMETRY_BIT;
+    if (pipelineStages & VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
+      result |= VK_SHADER_STAGE_FRAGMENT_BIT;
+    if (pipelineStages & VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT)
+      result |= VK_SHADER_STAGE_COMPUTE_BIT;
+    return result;
+  }
+
   
   uint32_t computeMipLevelCount(VkExtent3D imageSize) {
     uint32_t maxDim = std::max(imageSize.width, imageSize.height);

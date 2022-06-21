@@ -14,6 +14,15 @@ namespace dxvk::util {
           VkShaderStageFlags shaderStages);
   
   /**
+   * \brief Gets shader stage flags included in pipeline stages
+   *
+   * \param [in] pipelineStages Pipeline stage flags
+   * \returns Corresponding shader stage flags, if any
+   */
+  VkShaderStageFlags shaderStages(
+          VkPipelineStageFlags pipelineStages);
+
+  /**
    * \brief Computes number of mip levels for an image
    * 
    * \param [in] imageSize Size of the image
