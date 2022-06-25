@@ -232,6 +232,46 @@ namespace dxvk {
                 || !required.extCustomBorderColor.customBorderColorWithoutFormat)
         && (m_deviceFeatures.extDepthClipEnable.depthClipEnable
                 || !required.extDepthClipEnable.depthClipEnable)
+        && (m_deviceFeatures.extDescriptorIndexing.shaderInputAttachmentArrayDynamicIndexing
+                || !required.extDescriptorIndexing.shaderInputAttachmentArrayDynamicIndexing)
+        && (m_deviceFeatures.extDescriptorIndexing.shaderUniformTexelBufferArrayDynamicIndexing
+                || !required.extDescriptorIndexing.shaderUniformTexelBufferArrayDynamicIndexing)
+        && (m_deviceFeatures.extDescriptorIndexing.shaderStorageTexelBufferArrayDynamicIndexing
+                || !required.extDescriptorIndexing.shaderStorageTexelBufferArrayDynamicIndexing)
+        && (m_deviceFeatures.extDescriptorIndexing.shaderUniformBufferArrayNonUniformIndexing
+                || !required.extDescriptorIndexing.shaderUniformBufferArrayNonUniformIndexing)
+        && (m_deviceFeatures.extDescriptorIndexing.shaderSampledImageArrayNonUniformIndexing
+                || !required.extDescriptorIndexing.shaderSampledImageArrayNonUniformIndexing)
+        && (m_deviceFeatures.extDescriptorIndexing.shaderStorageBufferArrayNonUniformIndexing
+                || !required.extDescriptorIndexing.shaderStorageBufferArrayNonUniformIndexing)
+        && (m_deviceFeatures.extDescriptorIndexing.shaderStorageImageArrayNonUniformIndexing
+                || !required.extDescriptorIndexing.shaderStorageImageArrayNonUniformIndexing)
+        && (m_deviceFeatures.extDescriptorIndexing.shaderInputAttachmentArrayNonUniformIndexing
+                || !required.extDescriptorIndexing.shaderInputAttachmentArrayNonUniformIndexing)
+        && (m_deviceFeatures.extDescriptorIndexing.shaderUniformTexelBufferArrayNonUniformIndexing
+                || !required.extDescriptorIndexing.shaderUniformTexelBufferArrayNonUniformIndexing)
+        && (m_deviceFeatures.extDescriptorIndexing.shaderStorageTexelBufferArrayNonUniformIndexing
+                || !required.extDescriptorIndexing.shaderStorageTexelBufferArrayNonUniformIndexing)
+        && (m_deviceFeatures.extDescriptorIndexing.descriptorBindingUniformBufferUpdateAfterBind
+                || !required.extDescriptorIndexing.descriptorBindingUniformBufferUpdateAfterBind)
+        && (m_deviceFeatures.extDescriptorIndexing.descriptorBindingSampledImageUpdateAfterBind
+                || !required.extDescriptorIndexing.descriptorBindingSampledImageUpdateAfterBind)
+        && (m_deviceFeatures.extDescriptorIndexing.descriptorBindingStorageImageUpdateAfterBind
+                || !required.extDescriptorIndexing.descriptorBindingStorageImageUpdateAfterBind)
+        && (m_deviceFeatures.extDescriptorIndexing.descriptorBindingStorageBufferUpdateAfterBind
+                || !required.extDescriptorIndexing.descriptorBindingStorageBufferUpdateAfterBind)
+        && (m_deviceFeatures.extDescriptorIndexing.descriptorBindingUniformTexelBufferUpdateAfterBind
+                || !required.extDescriptorIndexing.descriptorBindingUniformTexelBufferUpdateAfterBind)
+        && (m_deviceFeatures.extDescriptorIndexing.descriptorBindingStorageTexelBufferUpdateAfterBind
+                || !required.extDescriptorIndexing.descriptorBindingStorageTexelBufferUpdateAfterBind)
+        && (m_deviceFeatures.extDescriptorIndexing.descriptorBindingUpdateUnusedWhilePending
+                || !required.extDescriptorIndexing.descriptorBindingUpdateUnusedWhilePending)
+        && (m_deviceFeatures.extDescriptorIndexing.descriptorBindingPartiallyBound
+                || !required.extDescriptorIndexing.descriptorBindingPartiallyBound)
+        && (m_deviceFeatures.extDescriptorIndexing.descriptorBindingVariableDescriptorCount
+                || !required.extDescriptorIndexing.descriptorBindingVariableDescriptorCount)
+        && (m_deviceFeatures.extDescriptorIndexing.runtimeDescriptorArray
+                || !required.extDescriptorIndexing.runtimeDescriptorArray)
         && (m_deviceFeatures.extExtendedDynamicState.extendedDynamicState
                 || !required.extExtendedDynamicState.extendedDynamicState)
         && (m_deviceFeatures.extHostQueryReset.hostQueryReset
@@ -263,13 +303,14 @@ namespace dxvk {
           DxvkDeviceFeatures  enabledFeatures) {
     DxvkDeviceExtensions devExtensions;
 
-    std::array<DxvkExt*, 29> devExtensionList = {{
+    std::array<DxvkExt*, 30> devExtensionList = {{
       &devExtensions.amdMemoryOverallocationBehaviour,
       &devExtensions.amdShaderFragmentMask,
       &devExtensions.ext4444Formats,
       &devExtensions.extConservativeRasterization,
       &devExtensions.extCustomBorderColor,
       &devExtensions.extDepthClipEnable,
+      &devExtensions.extDescriptorIndexing,
       &devExtensions.extExtendedDynamicState,
       &devExtensions.extFullScreenExclusive,
       &devExtensions.extHostQueryReset,
@@ -328,7 +369,16 @@ namespace dxvk {
 
     enabledFeatures.ext4444Formats.formatA4B4G4R4 = m_deviceFeatures.ext4444Formats.formatA4B4G4R4;
     enabledFeatures.ext4444Formats.formatA4R4G4B4 = m_deviceFeatures.ext4444Formats.formatA4R4G4B4;
-    
+
+    enabledFeatures.extDescriptorIndexing.descriptorBindingUniformBufferUpdateAfterBind = VK_TRUE;
+    enabledFeatures.extDescriptorIndexing.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
+    enabledFeatures.extDescriptorIndexing.descriptorBindingStorageImageUpdateAfterBind = VK_TRUE;
+    enabledFeatures.extDescriptorIndexing.descriptorBindingStorageBufferUpdateAfterBind = VK_TRUE;
+    enabledFeatures.extDescriptorIndexing.descriptorBindingUniformTexelBufferUpdateAfterBind = VK_TRUE;
+    enabledFeatures.extDescriptorIndexing.descriptorBindingStorageTexelBufferUpdateAfterBind = VK_TRUE;
+    enabledFeatures.extDescriptorIndexing.descriptorBindingUpdateUnusedWhilePending = VK_TRUE;
+    enabledFeatures.extDescriptorIndexing.descriptorBindingPartiallyBound = VK_TRUE;
+
     Logger::info(str::format("Device properties:"
       "\n  Device name:     : ", m_deviceInfo.core.properties.deviceName,
       "\n  Driver version   : ",
@@ -360,6 +410,11 @@ namespace dxvk {
     if (devExtensions.extDepthClipEnable) {
       enabledFeatures.extDepthClipEnable.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEPTH_CLIP_ENABLE_FEATURES_EXT;
       enabledFeatures.extDepthClipEnable.pNext = std::exchange(enabledFeatures.core.pNext, &enabledFeatures.extDepthClipEnable);
+    }
+
+    if (devExtensions.extDescriptorIndexing) {
+      enabledFeatures.extDescriptorIndexing.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
+      enabledFeatures.extDescriptorIndexing.pNext = std::exchange(enabledFeatures.core.pNext, &enabledFeatures.extDescriptorIndexing);
     }
 
     if (devExtensions.extExtendedDynamicState) {
@@ -591,6 +646,11 @@ namespace dxvk {
       m_deviceInfo.extCustomBorderColor.pNext = std::exchange(m_deviceInfo.core.pNext, &m_deviceInfo.extCustomBorderColor);
     }
 
+    if (m_deviceExtensions.supports(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME)) {
+      m_deviceInfo.extDescriptorIndexing.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES_EXT;
+      m_deviceInfo.extDescriptorIndexing.pNext = std::exchange(m_deviceInfo.core.pNext, &m_deviceInfo.extDescriptorIndexing);
+    }
+
     if (m_deviceExtensions.supports(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME)) {
       m_deviceInfo.extRobustness2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_PROPERTIES_EXT;
       m_deviceInfo.extRobustness2.pNext = std::exchange(m_deviceInfo.core.pNext, &m_deviceInfo.extRobustness2);
@@ -665,6 +725,11 @@ namespace dxvk {
     if (m_deviceExtensions.supports(VK_EXT_DEPTH_CLIP_ENABLE_EXTENSION_NAME)) {
       m_deviceFeatures.extDepthClipEnable.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEPTH_CLIP_ENABLE_FEATURES_EXT;
       m_deviceFeatures.extDepthClipEnable.pNext = std::exchange(m_deviceFeatures.core.pNext, &m_deviceFeatures.extDepthClipEnable);
+    }
+
+    if (m_deviceExtensions.supports(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME)) {
+      m_deviceFeatures.extDescriptorIndexing.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
+      m_deviceFeatures.extDescriptorIndexing.pNext = std::exchange(m_deviceFeatures.core.pNext, &m_deviceFeatures.extDescriptorIndexing);
     }
 
     if (m_deviceExtensions.supports(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME)) {
