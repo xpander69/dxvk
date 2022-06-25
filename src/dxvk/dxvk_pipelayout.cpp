@@ -158,10 +158,16 @@ namespace dxvk {
   : m_device(device) {
     auto vk = m_device->vkd();
 
+    std::array<VkDescriptorBindingFlags, MaxNumActiveBindings> bindingFlags;
     std::array<VkDescriptorSetLayoutBinding, MaxNumActiveBindings> bindingInfos;
     std::array<VkDescriptorUpdateTemplateEntry, MaxNumActiveBindings> templateInfos;
 
-    VkDescriptorSetLayoutCreateInfo layoutInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+    VkDescriptorSetLayoutBindingFlagsCreateInfoEXT flagsInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT };
+    flagsInfo.bindingCount = key.getBindingCount();
+    flagsInfo.pBindingFlags = bindingFlags.data();
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO, &flagsInfo };
+    layoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT;
     layoutInfo.bindingCount = key.getBindingCount();
     layoutInfo.pBindings = bindingInfos.data();
 
@@ -174,6 +180,10 @@ namespace dxvk {
       bindingInfo.descriptorCount = 1;
       bindingInfo.stageFlags = entry.stages;
       bindingInfo.pImmutableSamplers = nullptr;
+
+      bindingFlags[i] = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT
+                      | VK_DESCRIPTOR_BINDING_UPDATE_UNUSED_WHILE_PENDING_BIT_EXT
+                      | VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT;
 
       VkDescriptorUpdateTemplateEntry& templateInfo = templateInfos[i];
       templateInfo.dstBinding = i;

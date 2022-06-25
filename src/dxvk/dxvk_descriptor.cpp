@@ -308,7 +308,7 @@ namespace dxvk {
     VkDescriptorPoolCreateInfo info;
     info.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     info.pNext         = nullptr;
-    info.flags         = 0;
+    info.flags         = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
     info.maxSets       = maxSets;
     info.poolSizeCount = pools.size();
     info.pPoolSizes    = pools.data();
