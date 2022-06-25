@@ -81,6 +81,8 @@ namespace dxvk {
   VkResult DxvkCommandList::submit(
           VkSemaphore     waitSemaphore,
           VkSemaphore     wakeSemaphore) {
+    this->executeDescriptorUpdates();
+
     const auto& graphics = m_device->queues().graphics;
     const auto& transfer = m_device->queues().transfer;
 
@@ -187,6 +189,8 @@ namespace dxvk {
       descriptorPools.second->recycleDescriptorPool(descriptorPools.first);
 
     m_descriptorPools.clear();
+    m_descriptorInfos.clear();
+    m_descriptorUpdates.clear();
   }
 
 
@@ -219,4 +223,16 @@ namespace dxvk {
   void DxvkCommandList::cmdInsertDebugUtilsLabel(VkDebugUtilsLabelEXT *pLabelInfo) {
     m_vki->vkCmdInsertDebugUtilsLabelEXT(m_execBuffer, pLabelInfo);
   }
+
+  void DxvkCommandList::executeDescriptorUpdates() {
+    for (const auto& update : m_descriptorUpdates) {
+      m_vkd->vkUpdateDescriptorSetWithTemplate(m_vkd->device(),
+        update.descriptorSet, update.descriptorTemplate,
+        &m_descriptorInfos[update.firstDescriptor]);
+    }
+
+    m_descriptorInfos.clear();
+    m_descriptorUpdates.clear();
+  }
+
 }

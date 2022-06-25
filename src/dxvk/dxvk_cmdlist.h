@@ -762,8 +762,30 @@ namespace dxvk {
       m_descriptorPools.push_back({ pool, manager });
     }
 
+    DxvkDescriptorInfo* deferDescriptorSetUpdate(
+            uint32_t                      descriptorCount,
+            VkDescriptorSet               descriptorSet,
+            VkDescriptorUpdateTemplate    descriptorTemplate) {
+      size_t index = m_descriptorInfos.size();
+      m_descriptorInfos.resize(index + descriptorCount);
+
+      DescriptorUpdate update;
+      update.descriptorSet = descriptorSet;
+      update.descriptorTemplate = descriptorTemplate;
+      update.firstDescriptor = index;
+
+      m_descriptorUpdates.push_back(update);
+      return &m_descriptorInfos[index];
+    }
+
   private:
-    
+
+    struct DescriptorUpdate {
+      VkDescriptorSet descriptorSet;
+      VkDescriptorUpdateTemplate descriptorTemplate;
+      size_t firstDescriptor;
+    };
+
     DxvkDevice*         m_device;
     Rc<vk::DeviceFn>    m_vkd;
     Rc<vk::InstanceFn>  m_vki;
@@ -791,6 +813,9 @@ namespace dxvk {
       Rc<DxvkDescriptorPool>,
       Rc<DxvkDescriptorManager>>> m_descriptorPools;
 
+    std::vector<DescriptorUpdate>   m_descriptorUpdates;
+    std::vector<DxvkDescriptorInfo> m_descriptorInfos;
+
     VkCommandBuffer getCmdBuffer(DxvkCmdBuffer cmdBuffer) const {
       if (cmdBuffer == DxvkCmdBuffer::ExecBuffer) return m_execBuffer;
       if (cmdBuffer == DxvkCmdBuffer::InitBuffer) return m_initBuffer;
@@ -802,7 +827,9 @@ namespace dxvk {
             VkQueue               queue,
             VkFence               fence,
       const DxvkQueueSubmission&  info);
-    
+
+    void executeDescriptorUpdates();
+
   };
   
 }
