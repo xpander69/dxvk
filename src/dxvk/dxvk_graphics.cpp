@@ -986,16 +986,126 @@ namespace dxvk {
     if (m_shaders.gs  != nullptr) Logger::log(level, str::format("  gs  : ", m_shaders.gs ->debugName()));
     if (m_shaders.fs  != nullptr) Logger::log(level, str::format("  fs  : ", m_shaders.fs ->debugName()));
 
-    for (uint32_t i = 0; i < state.il.attributeCount(); i++) {
-      const auto& attr = state.ilAttributes[i];
-      Logger::log(level, str::format("  attr ", i, " : location ", attr.location(), ", binding ", attr.binding(), ", format ", attr.format(), ", offset ", attr.offset()));
-    }
+    // Log input assembly state
+    VkPrimitiveTopology topology = state.ia.primitiveTopology();
+
+    Logger::log(level, str::format(std::dec, "Primitive topology: ", topology,
+      (topology == VK_PRIMITIVE_TOPOLOGY_PATCH_LIST
+        ? str::format(" [", state.ia.patchVertexCount(), "]")
+        : str::format(" [restart: ", state.ia.primitiveRestart() ? "yes]" : "no]"))));
+
+    // Log vertex input state
     for (uint32_t i = 0; i < state.il.bindingCount(); i++) {
-      const auto& bind = state.ilBindings[i];
-      Logger::log(level, str::format("  binding ", i, " : binding ", bind.binding(), ", stride ", bind.stride(), ", rate ", bind.inputRate(), ", divisor ", bind.divisor()));
+      const auto& binding = state.ilBindings[i];
+      Logger::log(level, str::format("Vertex binding ", binding.binding(), ": stride ", binding.stride()));
+
+      for (uint32_t j = 0; j < state.il.attributeCount(); j++) {
+        const auto& attribute = state.ilAttributes[j];
+
+        if (attribute.binding() == binding.binding())
+          Logger::log(level, str::format("  ", attribute.location(), " [", attribute.offset(), "]: ", attribute.format()));
+      }
     }
-    
-    // TODO log more pipeline state
+
+    // Log rasterizer state
+    std::string cullMode;
+
+    switch (state.rs.cullMode()) {
+      case VK_CULL_MODE_NONE: cullMode = "none"; break;
+      case VK_CULL_MODE_BACK_BIT: cullMode = "back"; break;
+      case VK_CULL_MODE_FRONT_BIT: cullMode = "front"; break;
+      case VK_CULL_MODE_FRONT_AND_BACK: cullMode = "both"; break;
+      default: cullMode = str::format(state.rs.cullMode());
+    }
+
+    Logger::log(level, str::format("Rasterizer state:",
+      "\n  depth clip:      ", (state.rs.depthClipEnable() ? "yes" : "no"),
+      "\n  depth bias:      ", (state.rs.depthBiasEnable() ? "yes" : "no"),
+      "\n  polygon mode:    ", state.rs.polygonMode(),
+      "\n  cull mode:       ", cullMode,
+      "\n  front face:      ", state.rs.frontFace(),
+      "\n  conservative:    ", (state.rs.conservativeMode() == VK_CONSERVATIVE_RASTERIZATION_MODE_DISABLED_EXT ? "no" : "yes")));
+
+    // Log multisample state
+    VkSampleCountFlags sampleCount = VK_SAMPLE_COUNT_1_BIT;
+
+    if (state.ms.sampleCount())
+      sampleCount = state.ms.sampleCount();
+    else if (state.rs.sampleCount())
+      sampleCount = state.rs.sampleCount();
+
+    Logger::log(level, str::format("Sample count: ", sampleCount, " [0x", std::hex, state.ms.sampleMask(), std::dec, "]",
+      "\n  alphaToCoverage: ", (state.ms.enableAlphaToCoverage() ? "yes" : "no")));
+
+    // Log depth-stencil state
+    Logger::log(level, str::format("Depth test:        ", state.ds.enableDepthTest()
+      ? str::format("yes [write: ", (state.ds.enableDepthWrite() ? "yes" : "no"), ", op: ", state.ds.depthCompareOp(), "]")
+      : str::format("no")));
+    Logger::log(level, str::format("Depth bounds test: ",
+      (state.ds.enableDepthBoundsTest() ? "yes" : "no")));
+    Logger::log(level, str::format("Stencil test:      ",
+      (state.ds.enableStencilTest() ? "yes" : "no")));
+
+    if (state.ds.enableStencilTest()) {
+      std::array<VkStencilOpState, 2> states = {{
+        state.dsFront.state(),
+        state.dsBack.state(),
+      }};
+
+      for (size_t i = 0; i < states.size(); i++) {
+        Logger::log(level, str::format(std::hex, (i ? "  back:  " : "  front: "),
+          "[c=0x", states[i].compareMask, ",w=0x", states[i].writeMask, ",op=", states[i].compareOp, "] ",
+          "fail = ", states[i].failOp, ", pass = ", states[i].passOp,
+          ", depthFail = ", states[i].depthFailOp, std::dec));
+      }
+    }
+
+    // Log logic op state
+    Logger::log(level, str::format("Logic op:          ", (state.om.enableLogicOp()
+      ? str::format("yes [", state.om.logicOp(), "]")
+      : str::format("no"))));
+
+    // Log render target and blend state
+    auto depthFormat = state.rt.getDepthStencilFormat();
+    auto depthFormatInfo = imageFormatInfo(depthFormat);
+
+    VkImageAspectFlags writableAspects = depthFormat
+      ? (depthFormatInfo->aspectMask & ~state.rt.getDepthStencilReadOnlyAspects())
+      : 0u;
+
+    Logger::log(level, str::format("Depth attachment: ", depthFormat, depthFormat
+      ? str::format(" [",
+        ((writableAspects & VK_IMAGE_ASPECT_DEPTH_BIT) ? "d" : " "),
+        ((writableAspects & VK_IMAGE_ASPECT_STENCIL_BIT) ? "s" : " "), "]")
+      : str::format()));
+
+    bool hasColorAttachments = false;
+
+    for (uint32_t i = 0; i < MaxNumRenderTargets; i++) {
+      auto format = state.rt.getColorFormat(i);
+
+      if (format) {
+        if (!hasColorAttachments) {
+          Logger::log(level, "Color attachments:");
+          hasColorAttachments = true;
+        }
+
+        const char* components = "rgba";
+        const auto& blend = state.omBlend[i];
+        const auto& swizzle = state.omSwizzle[i];
+
+        VkColorComponentFlags writeMask = blend.colorWriteMask();
+        char r = (writeMask & (1u << swizzle.rIndex())) ? components[swizzle.rIndex()] : ' ';
+        char g = (writeMask & (1u << swizzle.gIndex())) ? components[swizzle.gIndex()] : ' ';
+        char b = (writeMask & (1u << swizzle.bIndex())) ? components[swizzle.bIndex()] : ' ';
+        char a = (writeMask & (1u << swizzle.aIndex())) ? components[swizzle.aIndex()] : ' ';
+
+        Logger::log(level, str::format("  ", i, ": ", format, " [", r, g, b, a, "] blend: ", (blend.blendEnable()
+          ? str::format("yes (c:", blend.srcColorBlendFactor(), ",", blend.dstColorBlendFactor(), ",", blend.colorBlendOp(),
+                            ";a:", blend.srcAlphaBlendFactor(), ",", blend.dstAlphaBlendFactor(), ",", blend.alphaBlendOp(), ")")
+          : str::format("no"))));
+      }
+    }
   }
   
 }
