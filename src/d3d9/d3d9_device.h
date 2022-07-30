@@ -26,6 +26,7 @@
 #include "d3d9_fixed_function.h"
 #include "d3d9_swvp_emu.h"
 
+#include "d3d9_spec_constants.h"
 #include "d3d9_shader_permutations.h"
 
 #include <unordered_set>
@@ -80,6 +81,8 @@ namespace dxvk {
     DirtyPointScale,
 
     InScene,
+
+    DirtySpecializationEntries,
   };
 
   using D3D9DeviceFlags = Flags<D3D9DeviceFlag>;
@@ -826,8 +829,6 @@ namespace dxvk {
 
     void BindDepthBias();
 
-    void BindAlphaTestState();
-
     inline void UploadSoftwareConstantSet(const D3D9ShaderConstantsVSSoftware& Src, const D3D9ConstantLayout& Layout);
 
     inline void* CopySoftwareConstants(D3D9ConstantBuffer& dstBuffer, const void* src, uint32_t size);
@@ -1134,13 +1135,17 @@ namespace dxvk {
 
     bool UseProgrammablePS();
 
-    void UpdateBoolSpecConstantVertex(uint32_t value);
+    void BindAlphaTestState();
 
-    void UpdateBoolSpecConstantPixel(uint32_t value);
+    void UpdateAlphaTestSpec(VkCompareOp alphaOp);
+    void UpdateVertexBoolSpec(uint32_t value);
+    void UpdatePixelBoolSpec(uint32_t value);
+    void UpdatePixelShaderSamplerSpec(uint32_t types, uint32_t projections, uint32_t fetch4);
+    void UpdateCommonSamplerSpec(uint32_t boundMask, uint32_t depthMask);
+    void UpdatePointModeSpec(uint32_t mode);
+    void UpdateFogModeSpec(bool fogEnabled, D3DFOGMODE vertexFogMode, D3DFOGMODE pixelFogMode);
 
-    void UpdatePsSamplerSpecConstants(uint32_t types, uint32_t projections, uint32_t fetch4);
-
-    void UpdateCommonSamplerSpecConstants(uint32_t boundMask, uint32_t depthMask);
+    void BindSpecConstants();
 
     void TrackBufferMappingBufferSequenceNumber(
       D3D9CommonBuffer* pResource);
@@ -1249,6 +1254,8 @@ namespace dxvk {
     uint32_t                        m_lastFetch4    = 0;
     uint32_t                        m_lastHazardsDS = 0;
     uint32_t                        m_lastSamplerTypesFF = 0;
+
+    D3D9SpecializationInfo          m_specInfo = D3D9SpecializationInfo();
 
     D3D9ShaderMasks                 m_vsShaderMasks = D3D9ShaderMasks();
     D3D9ShaderMasks                 m_psShaderMasks = FixedFunctionMask;
