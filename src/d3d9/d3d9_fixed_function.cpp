@@ -44,7 +44,7 @@ namespace dxvk {
       fogCtx.IsPixel ? SpecPixelFogMode : SpecVertexFogMode);
 
     uint32_t fogEnabled = spec.get(spvModule, fogCtx.SpecUBO, SpecFogEnabled);
-    fogEnabled = spvModule.opIEqual(spvModule.defBoolType(), fogEnabled, spvModule.constu32(0));
+    fogEnabled = spvModule.opINotEqual(spvModule.defBoolType(), fogEnabled, spvModule.constu32(0));
 
     uint32_t doFog   = spvModule.allocateId();
     uint32_t skipFog = spvModule.allocateId();
