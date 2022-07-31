@@ -1251,7 +1251,6 @@ namespace dxvk {
     uint32_t                        m_lastProjectionBitfield = 0;
     uint32_t                        m_lastSamplerNull = 0;
     uint32_t                        m_lastSamplerTypes = 0;
-    uint32_t                        m_lastPointMode = 0;
     uint32_t                        m_lastFetch4    = 0;
     uint32_t                        m_lastHazardsDS = 0;
     uint32_t                        m_lastSamplerTypesFF = 0;

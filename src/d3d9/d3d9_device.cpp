@@ -6011,7 +6011,7 @@ namespace dxvk {
 
     if (PrimitiveType == D3DPT_POINTLIST)
       UpdatePointMode<true>();
-    else if (m_lastPointMode != 0)
+    else
       UpdatePointMode<false>();
 
     if (likely(UseProgrammableVS())) {
