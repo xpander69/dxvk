@@ -244,7 +244,7 @@ namespace dxvk {
   }
 
 
-  uint32_t SetupSpecUBO(SpirvModule& spvModule) {
+  uint32_t SetupSpecUBO(SpirvModule& spvModule, std::vector<DxvkBindingInfo>& bindings) {
     uint32_t uintType = spvModule.defIntType(32, 0);
 
     std::array<uint32_t, SpecConstantCount> specMembers;
@@ -269,6 +269,12 @@ namespace dxvk {
     spvModule.setDebugName         (specBlock, "spec_state");
     spvModule.decorateDescriptorSet(specBlock, 0);
     spvModule.decorateBinding      (specBlock, getSpecConstantBufferSlot());
+
+    DxvkBindingInfo binding = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER };
+    binding.resourceBinding = getSpecConstantBufferSlot();
+    binding.viewType        = VK_IMAGE_VIEW_TYPE_MAX_ENUM;
+    binding.access          = VK_ACCESS_UNIFORM_READ_BIT;
+    bindings.push_back(binding);
 
     return specBlock;
   }
@@ -1449,7 +1455,7 @@ namespace dxvk {
 
   void D3D9FFShaderCompiler::setupVS() {
     setupRenderStateInfo();
-    m_specUbo = SetupSpecUBO(m_module);
+    m_specUbo = SetupSpecUBO(m_module, m_bindings);
 
     // VS Caps
     m_module.enableCapability(spv::CapabilityClipDistance);
@@ -1990,7 +1996,7 @@ namespace dxvk {
 
   void D3D9FFShaderCompiler::setupPS() {
     setupRenderStateInfo();
-    m_specUbo = SetupSpecUBO(m_module);
+    m_specUbo = SetupSpecUBO(m_module, m_bindings);
 
     // PS Caps
     m_module.enableCapability(spv::CapabilityDerivativeControl);

@@ -70,7 +70,7 @@ namespace dxvk {
 
   uint32_t GetSharedConstants(SpirvModule& spvModule);
 
-  uint32_t SetupSpecUBO(SpirvModule& spvModule);
+  uint32_t SetupSpecUBO(SpirvModule& spvModule, std::vector<DxvkBindingInfo>& bindings);
 
   constexpr uint32_t TCIOffset = 16;
   constexpr uint32_t TCIMask   = 0b111 << TCIOffset;
