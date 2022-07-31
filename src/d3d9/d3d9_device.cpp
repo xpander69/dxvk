@@ -4874,6 +4874,11 @@ namespace dxvk {
       CanSWVP()
         ? sizeof(D3D9FixedFunctionVertexBlendDataSW)
         : sizeof(D3D9FixedFunctionVertexBlendDataHW));
+
+    m_specBuffer = D3D9ConstantBuffer(this,
+      VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+      getSpecConstantBufferSlot(),
+      sizeof(D3D9SpecializationInfo));
   }
 
 
@@ -7287,6 +7292,11 @@ namespace dxvk {
       for (size_t i = 0; i < cSpecInfo.data.size(); i++)
         ctx->setSpecConstant(VK_PIPELINE_BIND_POINT_GRAPHICS, i, cSpecInfo.data[i]);
     });
+
+    // TODO: Make uploading specialization information less naive.
+    auto mapPtr = m_specBuffer.AllocSlice();
+    auto dst = reinterpret_cast<D3D9SpecializationInfo*>(mapPtr);
+    *dst = m_specInfo;
 
     m_flags.clr(D3D9DeviceFlag::DirtySpecializationEntries);
   }

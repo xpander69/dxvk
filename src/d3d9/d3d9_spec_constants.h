@@ -4,6 +4,7 @@
 
 #include <cstdint>
 
+#include "../dxvk/dxvk_limits.h"
 #include "../spirv/spirv_module.h"
 
 class D3D9DeviceEx;
@@ -89,22 +90,28 @@ namespace dxvk {
 
   class D3D9ShaderSpecConstantManager {
   public:
-    uint32_t get(SpirvModule &module, D3D9SpecConstantId id) {
+    uint32_t get(SpirvModule &module, uint32_t specUbo, D3D9SpecConstantId id) {
       const auto &layout = D3D9SpecializationInfo::Layout[id];
 
-      uint32_t val = getSpecConstDword(module, layout.dwordOffset);
+      uint32_t uintType = module.defIntType(32, 0);
+      uint32_t optimized = getOptimizedBool(module);
+
+      uint32_t quickValue     = getSpecUBODword(module, specUbo, layout.dwordOffset);
+      uint32_t optimizedValue = getSpecConstDword(module, layout.dwordOffset);
+
+      uint32_t val = module.opSelect(uintType, optimized, optimizedValue, quickValue);
       if (layout.sizeInBits == 32)
         return val;
 
       return module.opBitFieldUExtract(
-        module.defIntType(32, 0),
+        uintType,
         val,
         module.consti32(layout.bitOffset),
         module.consti32(layout.sizeInBits));
     }
 
   private:
-    uint32_t getSpecConstDword(SpirvModule &module, uint32_t idx) {
+    uint32_t getSpecConstDword(SpirvModule& module, uint32_t idx) {
       if (!m_specConstantIds[idx]) {
         m_specConstantIds[idx] = module.specConst32(module.defIntType(32, 0), 0);
         module.decorateSpecId(m_specConstantIds[idx], idx);
@@ -113,7 +120,28 @@ namespace dxvk {
       return m_specConstantIds[idx];
     }
 
-    std::array<uint32_t, D3D9SpecializationInfo::MaxSpecDwords> m_specConstantIds = {};
+    uint32_t getSpecUBODword(SpirvModule& module, uint32_t specUbo, uint32_t idx) {
+      uint32_t uintType = module.defIntType(32, 0);
+      uint32_t uintPtr  = module.defPointerType(uintType, spv::StorageClassUniform);
+
+      uint32_t member = module.constu32(idx);
+      uint32_t dword  = module.opLoad(uintType, module.opAccessChain(uintPtr, specUbo, 1, &member));
+
+      return dword;
+    }
+
+    uint32_t getOptimizedBool(SpirvModule& module) {
+      uint32_t boolType = module.defBoolType();
+
+      // The spec constant at MaxNumSpecConstants is set to True
+      // when this is an optimized pipeline.
+      uint32_t optimized = getSpecConstDword(module, MaxNumSpecConstants);
+      optimized = module.opINotEqual(boolType, optimized, module.constu32(0));
+
+      return optimized;
+    }
+
+    std::array<uint32_t, MaxNumSpecConstants + 1> m_specConstantIds = {};
   };
 
 }
