@@ -1186,6 +1186,7 @@ namespace dxvk {
     D3D9ConstantBuffer              m_vsVertexBlend;
     D3D9ConstantBuffer              m_psFixedFunction;
     D3D9ConstantBuffer              m_psShared;
+    D3D9ConstantBuffer              m_specBuffer;
 
     Rc<DxvkBuffer>                  m_upBuffer;
     VkDeviceSize                    m_upBufferOffset  = 0ull;
