@@ -13,6 +13,7 @@ namespace dxvk {
     this->ignoreGraphicsBarriers = config.getOption<bool>("d3d11.ignoreGraphicsBarriers", false);
     this->maxTessFactor         = config.getOption<int32_t>("d3d11.maxTessFactor", 0);
     this->samplerAnisotropy     = config.getOption<int32_t>("d3d11.samplerAnisotropy", -1);
+    this->samplerLodBias        = config.getOption<float>("d3d11.samplerLodBias", 0.0f);
     this->invariantPosition     = config.getOption<bool>("d3d11.invariantPosition", true);
     this->floatControls         = config.getOption<bool>("d3d11.floatControls", true);
     this->disableMsaa           = config.getOption<bool>("d3d11.disableMsaa", false);
