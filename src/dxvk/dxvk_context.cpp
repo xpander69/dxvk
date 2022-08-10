@@ -4666,7 +4666,7 @@ namespace dxvk {
     // On 32-bit wine, vkUpdateDescriptorSets has significant overhead due
     // to struct conversion, so we should use descriptor update templates.
     // For 64-bit applications, using templates is slower on some drivers.
-    constexpr bool useDescriptorTemplates = env::is32BitHostPlatform();
+    constexpr bool useDescriptorTemplates = true;
 
     bool independentSets = BindPoint == VK_PIPELINE_BIND_POINT_GRAPHICS
                         && m_flags.test(DxvkContextFlag::GpIndependentSets);
