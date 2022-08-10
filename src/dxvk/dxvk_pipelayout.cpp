@@ -163,14 +163,21 @@ namespace dxvk {
       bindingInfo.pImmutableSamplers = nullptr;
       bindingInfos.push_back(bindingInfo);
 
-      VkDescriptorUpdateTemplateEntry templateInfo;
-      templateInfo.dstBinding = i;
-      templateInfo.dstArrayElement = 0;
-      templateInfo.descriptorCount = 1;
-      templateInfo.descriptorType = entry.descriptorType;
-      templateInfo.offset = sizeof(DxvkDescriptorInfo) * i;
-      templateInfo.stride = sizeof(DxvkDescriptorInfo);
-      templateInfos.push_back(templateInfo);
+      if (templateInfos.empty()
+       || templateInfos.back().descriptorType != entry.descriptorType) {
+        VkDescriptorUpdateTemplateEntry templateInfo;
+        templateInfo.dstBinding = i;
+        templateInfo.dstArrayElement = 0;
+        templateInfo.descriptorCount = 1;
+        templateInfo.descriptorType = entry.descriptorType;
+        templateInfo.offset = sizeof(DxvkDescriptorInfo) * i;
+        templateInfo.stride = sizeof(DxvkDescriptorInfo);
+        templateInfos.push_back(templateInfo);
+      } else {
+        // This is legal per spec, if the descriptor count exceeds the
+        // array size of the binding it'll update subsequent bindings.
+        templateInfos.back().descriptorCount += 1;
+      }
     }
 
     VkDescriptorSetLayoutCreateInfo layoutInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
