@@ -8,13 +8,13 @@ namespace dxvk {
   
   DxvkPipelineWorkers::DxvkPipelineWorkers(
           DxvkDevice*                     device) {
-    // Use a reasonably large number of threads for compiling, but
-    // leave some cores to the application to avoid excessive stutter
-    uint32_t numCpuCores = dxvk::thread::hardware_concurrency();
-    m_workerCount = ((std::max(1u, numCpuCores) - 1) * 5) / 7;
+    m_workerCount = dxvk::thread::hardware_concurrency();
 
     if (m_workerCount <  1) m_workerCount =  1;
-    if (m_workerCount > 32) m_workerCount = 32;
+    if (m_workerCount > 64) m_workerCount = 64;
+
+    if (env::is32BitHostPlatform())
+      m_workerCount = std::min(m_workerCount, 16u);
 
     if (device->config().numCompilerThreads > 0)
       m_workerCount = device->config().numCompilerThreads;
@@ -27,7 +27,8 @@ namespace dxvk {
 
 
   void DxvkPipelineWorkers::compilePipelineLibrary(
-          DxvkShaderPipelineLibrary*      library) {
+          DxvkShaderPipelineLibrary*      library,
+          DxvkPipelinePriority            priority) {
     std::unique_lock lock(m_queueLock);
     this->startWorkers();
 
@@ -36,7 +37,13 @@ namespace dxvk {
     PipelineLibraryEntry e = { };
     e.pipelineLibrary = library;
 
-    m_queuedLibraries.push(e);
+    if (priority == DxvkPipelinePriority::High) {
+      m_queuedLibrariesPrioritized.push(e);
+      m_queueCondPrioritized.notify_one();
+    } else {
+      m_queuedLibraries.push(e);
+    }
+
     m_queueCond.notify_one();
   }
 
@@ -102,12 +109,19 @@ namespace dxvk {
     if (!m_workersRunning) {
       m_workersRunning = true;
 
-      Logger::info(str::format("DXVK: Using ", m_workerCount, " compiler threads"));
+      // Number of workers that can process pipeline pipelines with normal
+      // priority. Any other workers can only build high-priority pipelines.
+      uint32_t npWorkerCount = std::max(((m_workerCount - 1) * 5) / 7, 1u);
+      uint32_t hpWorkerCount = m_workerCount - npWorkerCount;
+
+      Logger::info(str::format("DXVK: Using ", npWorkerCount, " + ", hpWorkerCount, " compiler threads"));
       m_workers.resize(m_workerCount);
 
-      for (auto& worker : m_workers) {
-        worker = dxvk::thread([this] { runWorker(); });
-        worker.set_priority(ThreadPriority::Lowest);
+      for (size_t i = 0; i < m_workers.size(); i++) {
+        m_workers[i] = i >= npWorkerCount
+          ? dxvk::thread([this] { runWorkerPrioritized(); })
+          : dxvk::thread([this] { runWorker(); });
+        m_workers[i].set_priority(ThreadPriority::Lowest);
       }
     }
   }
@@ -124,6 +138,7 @@ namespace dxvk {
 
         m_queueCond.wait(lock, [this] {
           return !m_workersRunning
+              || !m_queuedLibrariesPrioritized.empty()
               || !m_queuedLibraries.empty()
               || !m_queuedPipelines.empty();
         });
@@ -132,6 +147,9 @@ namespace dxvk {
           // Skip pending work, exiting early is
           // more important in this case.
           break;
+        } else if (!m_queuedLibrariesPrioritized.empty()) {
+          l = m_queuedLibrariesPrioritized.front();
+          m_queuedLibrariesPrioritized.pop();
         } else if (!m_queuedLibraries.empty()) {
           l = m_queuedLibraries.front();
           m_queuedLibraries.pop();
@@ -158,6 +176,34 @@ namespace dxvk {
 
         m_pendingTasks -= 1;
       }
+    }
+  }
+
+
+  void DxvkPipelineWorkers::runWorkerPrioritized() {
+    env::setThreadName("dxvk-shader-p");
+
+    while (true) {
+      PipelineLibraryEntry l = { };
+
+      { std::unique_lock lock(m_queueLock);
+
+        m_queueCondPrioritized.wait(lock, [this] {
+          return !m_workersRunning
+              || !m_queuedLibrariesPrioritized.empty();
+        });
+
+        if (!m_workersRunning)
+          break;
+
+        l = m_queuedLibrariesPrioritized.front();
+        m_queuedLibrariesPrioritized.pop();
+      }
+
+      if (l.pipelineLibrary)
+        l.pipelineLibrary->compilePipeline();
+
+      m_pendingTasks -= 1;
     }
   }
 
@@ -285,10 +331,27 @@ namespace dxvk {
     const Rc<DxvkShader>&         shader) {
     if (canPrecompileShader(shader)) {
       auto library = createPipelineLibrary(shader);
-      m_workers.compilePipelineLibrary(library);
+      m_workers.compilePipelineLibrary(library, DxvkPipelinePriority::Normal);
     }
 
     m_stateCache.registerShader(shader);
+  }
+
+
+  void DxvkPipelineManager::requestCompileShader(
+    const Rc<DxvkShader>&         shader) {
+    if (!shader->needsLibraryCompile())
+      return;
+
+    // Dispatch high-priority compile job
+    auto library = findPipelineLibrary(shader);
+
+    if (library)
+      m_workers.compilePipelineLibrary(library, DxvkPipelinePriority::High);
+
+    // Notify immediately so that this only gets called
+    // once, even if compilation does ot start immediately
+    shader->notifyLibraryCompile();
   }
 
 

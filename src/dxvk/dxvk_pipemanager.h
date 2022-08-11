@@ -35,6 +35,14 @@ namespace dxvk {
   };
 
   /**
+   * \brief Pipeline priority
+   */
+  enum class DxvkPipelinePriority : uint32_t {
+    Normal  = 0,
+    High    = 1,
+  };
+
+  /**
    * \brief Pipeline manager worker threads
    *
    * Spawns worker threads to compile shader pipeline
@@ -56,9 +64,11 @@ namespace dxvk {
      * the pipeline with default compile arguments.
      * Note that pipeline libraries are high priority.
      * \param [in] library The pipeline library
+     * \param [in] priority Pipeline priority
      */
     void compilePipelineLibrary(
-            DxvkShaderPipelineLibrary*      library);
+            DxvkShaderPipelineLibrary*      library,
+            DxvkPipelinePriority            priority);
 
     /**
      * \brief Compiles an optimized compute pipeline
@@ -111,7 +121,9 @@ namespace dxvk {
 
     dxvk::mutex                       m_queueLock;
     dxvk::condition_variable          m_queueCond;
+    dxvk::condition_variable          m_queueCondPrioritized;
 
+    std::queue<PipelineLibraryEntry>  m_queuedLibrariesPrioritized;
     std::queue<PipelineLibraryEntry>  m_queuedLibraries;
     std::queue<PipelineEntry>         m_queuedPipelines;
 
@@ -122,6 +134,8 @@ namespace dxvk {
     void startWorkers();
 
     void runWorker();
+
+    void runWorkerPrioritized();
 
   };
 
@@ -188,7 +202,7 @@ namespace dxvk {
     DxvkGraphicsPipelineFragmentOutputLibrary* createFragmentOutputLibrary(
       const DxvkGraphicsPipelineFragmentOutputState& state);
 
-    /*
+    /**
      * \brief Registers a shader
      * 
      * Starts compiling pipelines asynchronously
@@ -198,7 +212,18 @@ namespace dxvk {
      */
     void registerShader(
       const Rc<DxvkShader>&         shader);
-    
+
+    /**
+     * \brief Prioritizes compilation of a given shader
+     *
+     * Adds the pipeline library for the given shader
+     * to the high-priority queue of the background
+     * workers to make sure it gets compiled quickly.
+     * \param [in] shader Newly compiled shader
+     */
+    void requestCompileShader(
+      const Rc<DxvkShader>&         shader);
+
     /**
      * \brief Retrieves total pipeline count
      * \returns Number of compute/graphics pipelines
