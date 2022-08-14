@@ -7,6 +7,25 @@
 
 namespace dxvk {
 
+  static inline void ConvertDisplayMode(const D3DDISPLAYMODEEX& mode, wsi::WsiMode* wsiMode) {
+    wsiMode->width        = mode.Width;
+    wsiMode->height       = mode.Height;
+    wsiMode->refreshRate  = wsi::WsiRational{ mode.RefreshRate, 1 };
+    wsiMode->bitsPerPixel = GetMonitorFormatBpp(EnumerateFormat(mode.Format));
+    wsiMode->interlaced   = false;
+  }
+
+
+  static inline void ConvertDisplayMode(const wsi::WsiMode& devMode, D3DDISPLAYMODEEX* pMode) {
+      pMode->Size             = sizeof(D3DDISPLAYMODEEX);
+      pMode->Width            = devMode.width;
+      pMode->Height           = devMode.height;
+      pMode->RefreshRate      = devMode.refreshRate.numerator / devMode.refreshRate.denominator;
+      pMode->Format           = D3DFMT_X8R8G8B8;
+      pMode->ScanLineOrdering = D3DSCANLINEORDERING_PROGRESSIVE;
+  }
+
+
   static uint16_t MapGammaControlPoint(float x) {
     if (x < 0.0f) x = 0.0f;
     if (x > 1.0f) x = 1.0f;
@@ -439,20 +458,14 @@ namespace dxvk {
       *pRotation = D3DDISPLAYROTATION_IDENTITY;
 
     if (pMode != nullptr) {
-      DEVMODEW devMode = DEVMODEW();
-      devMode.dmSize = sizeof(devMode);
+      wsi::WsiMode devMode = { };
 
-      if (!GetMonitorDisplayMode(GetDefaultMonitor(), ENUM_CURRENT_SETTINGS, &devMode)) {
+      if (!wsi::getCurrentDisplayMode(wsi::getDefaultMonitor(), &devMode)) {
         Logger::err("D3D9SwapChainEx::GetDisplayModeEx: Failed to enum display settings");
         return D3DERR_INVALIDCALL;
       }
 
-      pMode->Size             = sizeof(D3DDISPLAYMODEEX);
-      pMode->Width            = devMode.dmPelsWidth;
-      pMode->Height           = devMode.dmPelsHeight;
-      pMode->RefreshRate      = devMode.dmDisplayFrequency;
-      pMode->Format           = D3DFMT_X8R8G8B8;
-      pMode->ScanLineOrdering = D3DSCANLINEORDERING_PROGRESSIVE;
+      ConvertDisplayMode(devMode, pMode);
     }
 
     return D3D_OK;
@@ -485,17 +498,9 @@ namespace dxvk {
       D3D9WindowMessageFilter filter(m_window);
 
       if (!changeFullscreen) {
-        if (FAILED(ChangeDisplayMode(pPresentParams, pFullscreenDisplayMode)))
+        if (FAILED(ChangeDisplayMode(pPresentParams, pFullscreenDisplayMode, false)))
           return D3DERR_INVALIDCALL;
       }
-
-      // Move the window so that it covers the entire output    
-      RECT rect;
-      GetMonitorRect(GetDefaultMonitor(), &rect);
-    
-      ::SetWindowPos(m_window, HWND_TOPMOST,
-        rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top,
-        SWP_FRAMECHANGED | SWP_SHOWWINDOW | SWP_NOACTIVATE);
     }
 
     m_presentParams = *pPresentParams;
@@ -634,12 +639,12 @@ namespace dxvk {
     }
 
     if (pPresentParams->Windowed) {
-      GetWindowClientSize(pPresentParams->hDeviceWindow,
+      wsi::getWindowSize(pPresentParams->hDeviceWindow,
         pPresentParams->BackBufferWidth  ? nullptr : &pPresentParams->BackBufferWidth,
         pPresentParams->BackBufferHeight ? nullptr : &pPresentParams->BackBufferHeight);
     }
     else {
-      GetMonitorClientSize(GetDefaultMonitor(),
+      wsi::getMonitorClientSize(wsi::getDefaultMonitor(),
         pPresentParams->BackBufferWidth  ? nullptr : &pPresentParams->BackBufferWidth,
         pPresentParams->BackBufferHeight ? nullptr : &pPresentParams->BackBufferHeight);
     }
@@ -1038,7 +1043,7 @@ namespace dxvk {
     // Find a display mode that matches what we need
     ::GetWindowRect(m_window, &m_windowState.rect);
       
-    if (FAILED(ChangeDisplayMode(pPresentParams, pFullscreenDisplayMode))) {
+    if (FAILED(ChangeDisplayMode(pPresentParams, pFullscreenDisplayMode, true))) {
       Logger::err("D3D9: EnterFullscreenMode: Failed to change display mode");
       return D3DERR_INVALIDCALL;
     }
@@ -1053,28 +1058,13 @@ namespace dxvk {
 
     D3D9WindowMessageFilter filter(m_window);
     
-    // Change the window flags to remove the decoration etc.
-    LONG style   = ::GetWindowLongW(m_window, GWL_STYLE);
-    LONG exstyle = ::GetWindowLongW(m_window, GWL_EXSTYLE);
+    m_monitor = wsi::getDefaultMonitor();
+
+    if (!wsi::enterFullscreenMode(m_monitor, m_window, &m_windowState, true)) {
+        Logger::err("D3D9: EnterFullscreenMode: Failed to enter fullscreen mode");
+        return D3DERR_INVALIDCALL;
+    }
     
-    m_windowState.style = style;
-    m_windowState.exstyle = exstyle;
-    
-    style   &= ~WS_OVERLAPPEDWINDOW;
-    exstyle &= ~WS_EX_OVERLAPPEDWINDOW;
-    
-    ::SetWindowLongW(m_window, GWL_STYLE, style);
-    ::SetWindowLongW(m_window, GWL_EXSTYLE, exstyle);
-    
-    // Move the window so that it covers the entire output    
-    RECT rect;
-    GetMonitorRect(GetDefaultMonitor(), &rect);
-    
-    ::SetWindowPos(m_window, HWND_TOPMOST,
-      rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top,
-      SWP_FRAMECHANGED | SWP_SHOWWINDOW | SWP_NOACTIVATE);
-    
-    m_monitor = GetDefaultMonitor();
     return D3D_OK;
   }
   
@@ -1090,23 +1080,10 @@ namespace dxvk {
 
     ResetWindowProc(m_window);
     
-    // Only restore the window style if the application hasn't
-    // changed them. This is in line with what native D3D9 does.
-    LONG curStyle   = ::GetWindowLongW(m_window, GWL_STYLE) & ~WS_VISIBLE;
-    LONG curExstyle = ::GetWindowLongW(m_window, GWL_EXSTYLE) & ~WS_EX_TOPMOST;
-    
-    if (curStyle == (m_windowState.style & ~(WS_VISIBLE | WS_OVERLAPPEDWINDOW))
-     && curExstyle == (m_windowState.exstyle & ~(WS_EX_TOPMOST | WS_EX_OVERLAPPEDWINDOW))) {
-      ::SetWindowLongW(m_window, GWL_STYLE,   m_windowState.style);
-      ::SetWindowLongW(m_window, GWL_EXSTYLE, m_windowState.exstyle);
+    if (!wsi::leaveFullscreenMode(m_window, &m_windowState)) {
+      Logger::err("D3D9: LeaveFullscreenMode: Failed to exit fullscreen mode");
+      return D3DERR_NOTAVAILABLE;
     }
-    
-    // Restore window position and apply the style
-    const RECT rect = m_windowState.rect;
-    
-    ::SetWindowPos(m_window, 0,
-      rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top,
-      SWP_FRAMECHANGED | SWP_NOZORDER | SWP_NOACTIVATE);
     
     return D3D_OK;
   }
@@ -1114,7 +1091,8 @@ namespace dxvk {
   
   HRESULT D3D9SwapChainEx::ChangeDisplayMode(
           D3DPRESENT_PARAMETERS* pPresentParams,
-    const D3DDISPLAYMODEEX*      pFullscreenDisplayMode) {
+    const D3DDISPLAYMODEEX*      pFullscreenDisplayMode,
+          bool                   EnteringFullscreen) {
     D3DDISPLAYMODEEX mode;
 
     if (pFullscreenDisplayMode) {
@@ -1128,27 +1106,16 @@ namespace dxvk {
       mode.Size             = sizeof(D3DDISPLAYMODEEX);
     }
 
-    DEVMODEW devMode = { };
-    devMode.dmSize       = sizeof(devMode);
-    devMode.dmFields     = DM_PELSWIDTH | DM_PELSHEIGHT | DM_BITSPERPEL;
-    devMode.dmPelsWidth  = mode.Width;
-    devMode.dmPelsHeight = mode.Height;
-    devMode.dmBitsPerPel = GetMonitorFormatBpp(EnumerateFormat(mode.Format));
+    wsi::WsiMode wsiMode = { };
+    ConvertDisplayMode(mode, &wsiMode);
     
-    if (mode.RefreshRate != 0)  {
-      devMode.dmFields |= DM_DISPLAYFREQUENCY;
-      devMode.dmDisplayFrequency = mode.RefreshRate;
-    }
-    
-    HMONITOR monitor = GetDefaultMonitor();
+    HMONITOR monitor = wsi::getDefaultMonitor();
 
-    if (!SetMonitorDisplayMode(monitor, &devMode))
+    if (!wsi::setWindowMode(monitor, m_window, &wsiMode, EnteringFullscreen))
       return D3DERR_NOTAVAILABLE;
-
-    devMode.dmFields = DM_DISPLAYFREQUENCY;
     
-    if (GetMonitorDisplayMode(monitor, ENUM_CURRENT_SETTINGS, &devMode))
-      NotifyDisplayRefreshRate(double(devMode.dmDisplayFrequency));
+    if (wsi::getCurrentDisplayMode(monitor, &wsiMode))
+      NotifyDisplayRefreshRate(double(wsiMode.refreshRate.numerator) / double(wsiMode.refreshRate.denominator));
     else
       NotifyDisplayRefreshRate(0.0);
 
@@ -1160,7 +1127,7 @@ namespace dxvk {
     if (hMonitor == nullptr)
       return D3DERR_INVALIDCALL;
     
-    if (!RestoreMonitorDisplayMode())
+    if (!wsi::restoreDisplayMode())
       return D3DERR_NOTAVAILABLE;
 
     NotifyDisplayRefreshRate(0.0);
@@ -1181,7 +1148,7 @@ namespace dxvk {
     if (pDestRect == nullptr) {
       // TODO: Should we hook WM_SIZE message for this?
       UINT width, height;
-      GetWindowClientSize(m_window, &width, &height);
+      wsi::getWindowSize(m_window, &width, &height);
 
       dstRect.top    = 0;
       dstRect.left   = 0;
