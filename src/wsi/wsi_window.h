@@ -42,13 +42,15 @@ namespace dxvk::wsi {
     * \param [in] hWindow The window (may be unused on some platforms)
     * \param [in] pMode The mode
     * \param [in] EnteringFullscreen Are we entering fullscreen?
+    * \param [in] ForceTopMost Forces the window to be topmost (d3d9 vs d3d11 behaviour)
     * \returns \c true on success, \c false on failure
     */
   bool setWindowMode(
           HMONITOR         hMonitor,
           HWND             hWindow,
     const WsiMode*         pMode,
-          bool             EnteringFullscreen);
+          bool             EnteringFullscreen,
+          bool             ForceTopMost);
 
   /**
     * \brief Enter fullscreen mode for a window & monitor

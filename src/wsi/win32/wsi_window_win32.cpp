@@ -134,7 +134,8 @@ namespace dxvk::wsi {
           HMONITOR                hMonitor,
           HWND                    hWindow,
     const WsiMode*                pMode,
-          bool                    EnteringFullscreen) {
+          bool                    EnteringFullscreen,
+          bool                    ForceTopMost) {
     ::MONITORINFOEXW monInfo;
     monInfo.cbSize = sizeof(monInfo);
 
@@ -165,7 +166,16 @@ namespace dxvk::wsi {
     if (status && !EnteringFullscreen && hWindow != nullptr) {
       RECT newRect = { };
       getDesktopCoordinates(hMonitor, &newRect);
-      moveWindow(hWindow, newRect);
+      if (ForceTopMost) {
+        // In D3D9, changing display modes re-forces the window
+        // to become top most, whereas in DXGI, it does not.
+        ::SetWindowPos(hWindow, HWND_TOPMOST,
+          newRect.left, newRect.top,
+          newRect.right - newRect.left, newRect.bottom - newRect.top,
+          SWP_FRAMECHANGED | SWP_SHOWWINDOW | SWP_NOACTIVATE);
+      } else {
+        moveWindow(hWindow, newRect);
+      }
     }
     
     return status;

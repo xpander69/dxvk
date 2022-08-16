@@ -677,7 +677,7 @@ namespace dxvk {
     wsi::WsiMode wsiMode = { };
     ConvertDisplayMode(selectedMode1, &wsiMode);
 
-    return wsi::setWindowMode(outputDesc.Monitor, m_window, &wsiMode, EnteringFullscreen);
+    return wsi::setWindowMode(outputDesc.Monitor, m_window, &wsiMode, EnteringFullscreen, false);
   }
   
   

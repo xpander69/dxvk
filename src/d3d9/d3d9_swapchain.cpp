@@ -1111,7 +1111,7 @@ namespace dxvk {
     
     HMONITOR monitor = wsi::getDefaultMonitor();
 
-    if (!wsi::setWindowMode(monitor, m_window, &wsiMode, EnteringFullscreen))
+    if (!wsi::setWindowMode(monitor, m_window, &wsiMode, EnteringFullscreen, true))
       return D3DERR_NOTAVAILABLE;
     
     if (wsi::getCurrentDisplayMode(monitor, &wsiMode))
