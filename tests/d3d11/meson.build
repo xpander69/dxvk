@@ -4,6 +4,7 @@ executable('d3d11-compute'+exe_ext,   files('test_d3d11_compute.cpp'),   depende
 executable('d3d11-formats'+exe_ext,   files('test_d3d11_formats.cpp'),   dependencies : test_d3d11_deps, install : true, gui_app : true)
 executable('d3d11-map-read'+exe_ext,  files('test_d3d11_map_read.cpp'),  dependencies : test_d3d11_deps, install : true, gui_app : true)
 executable('d3d11-streamout'+exe_ext, files('test_d3d11_streamout.cpp'), dependencies : test_d3d11_deps, install : true, gui_app : true)
+executable('d3d11-tiled'+exe_ext,     files('test_d3d11_tiled.cpp'),     dependencies : test_d3d11_deps, install : true, gui_app : false)
 executable('d3d11-triangle'+exe_ext,  files('test_d3d11_triangle.cpp'),  dependencies : test_d3d11_deps, install : true, gui_app : true)
 executable('d3d11-video'+exe_ext,     files('test_d3d11_video.cpp'),     dependencies : test_d3d11_deps, install : true, gui_app : true)
 
