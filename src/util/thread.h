@@ -332,9 +332,43 @@ namespace dxvk {
   };
 
 #else
+  enum class ThreadPriority : int32_t {
+    Lowest      = -2,
+    BelowNormal = -1,
+    Normal      =  0,
+    AboveNormal =  1,
+    Highest     =  2
+  };
+
   class thread : public std::thread {
   public:
     using std::thread::thread;
+    
+    void set_priority(ThreadPriority priority) {
+      ::sched_param param = {};
+      int32_t policy;
+      switch (priority) {
+        case ThreadPriority::Highest:
+          policy = SCHED_FIFO;
+          param.sched_priority = sched_get_priority_max(SCHED_FIFO);
+          break;
+        case ThreadPriority::AboveNormal:
+          policy = SCHED_FIFO;
+          param.sched_priority = sched_get_priority_max(SCHED_FIFO) / 2;
+          break;
+        default:
+        case ThreadPriority::Normal:
+          policy = SCHED_OTHER;
+          break;
+        case ThreadPriority::BelowNormal:
+          policy = SCHED_BATCH;
+          break;
+        case ThreadPriority::Lowest:
+          policy = SCHED_IDLE;
+          break;
+      }
+      ::pthread_setschedparam(this->native_handle(), policy, &param);
+    }
   };
 
   using mutex              = std::mutex;
