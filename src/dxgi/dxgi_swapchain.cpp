@@ -171,7 +171,13 @@ namespace dxvk {
     pStats->PresentCount = m_presentCount;
     pStats->PresentRefreshCount = 0;
     pStats->SyncRefreshCount = 0;
+#ifdef _WIN32
     QueryPerformanceCounter(&pStats->SyncQPCTime);
+#else
+    auto now = dxvk::high_resolution_clock::now().time_since_epoch();
+    pStats->SyncQPCTime.QuadPart =
+      std::chrono::duration_cast<std::chrono::nanoseconds>(now).count();
+#endif
     pStats->SyncGPUTime.QuadPart = 0;
     return S_OK;
   }
