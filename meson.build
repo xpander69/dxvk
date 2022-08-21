@@ -103,6 +103,9 @@ else
   wrc_generator = generator(wrc, output : [ '@BASENAME@_ignored.h' ], arguments : [ '@OUTPUT@' ] )
 
   dxvk_include_path = include_directories('./include', './include/native', './include/native/windows', './include/native/directx')
+
+  dxvk_wsi = 'sdl2'
+  compiler_args += ['-DDXVK_WSI_SDL2']
 endif
 
 add_project_arguments(cpp.get_supported_arguments(compiler_args), language: 'cpp')
@@ -129,10 +132,6 @@ dxvk_version = vcs_tag(
   input:  'version.h.in',
   output: 'version.h',
 )
-
-if platform != 'windows'
-  error('Non-Windows platforms not supported... yet.')
-endif
 
 subdir('src')
 
