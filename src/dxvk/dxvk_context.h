@@ -90,6 +90,7 @@ namespace dxvk {
     void bindRenderTargets(
             DxvkRenderTargets&&   targets,
             VkImageAspectFlags    feedbackLoop) {
+      splitCommands();
       // Set up default render pass ops
       m_state.om.renderTargets = std::move(targets);
 
