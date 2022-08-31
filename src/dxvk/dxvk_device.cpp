@@ -349,5 +349,25 @@ namespace dxvk {
 
     return DxvkDeviceQueue { queue, family, index };
   }
+
+
+  void DxvkDevice::setDebugObjectName(
+          VkObjectType            objectType,
+          uint64_t                objectHandle,
+    const char*                   name) {
+    if (!m_instance->extensions().extDebugUtils)
+      return;
+
+    // This happens on 32-bit
+    if (objectType == VK_OBJECT_TYPE_UNKNOWN)
+      return;
+
+    VkDebugUtilsObjectNameInfoEXT nameInfo = { VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT };
+    nameInfo.objectType = objectType;
+    nameInfo.objectHandle = objectHandle;
+    nameInfo.pObjectName = name;
+
+    m_vkd->vkSetDebugUtilsObjectNameEXT(m_vkd->device(), &nameInfo);
+  }
   
 }

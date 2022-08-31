@@ -12,6 +12,7 @@
 #include "dxvk_framebuffer.h"
 #include "dxvk_image.h"
 #include "dxvk_instance.h"
+#include "dxvk_marker.h"
 #include "dxvk_memory.h"
 #include "dxvk_meta_clear.h"
 #include "dxvk_objects.h"
@@ -25,7 +26,7 @@
 #include "dxvk_sparse.h"
 #include "dxvk_stats.h"
 #include "dxvk_unbound.h"
-#include "dxvk_marker.h"
+#include "dxvk_util.h"
 
 #include "../vulkan/vulkan_presenter.h"
 
@@ -516,7 +517,22 @@ namespace dxvk {
      * used by the GPU can be safely destroyed.
      */
     void waitForIdle();
-    
+
+    /**
+     * \brief Sets Vulkan object name
+     *
+     * \param [in] object Object
+     * \param [in] name Debug name
+     */
+    template<typename T>
+    void setDebugObjectName(
+            T         object,
+      const char*     name) {
+      this->setDebugObjectName(
+        util::getVulkanObjectType(object),
+        uint64_t(object), name);
+    }
+
   private:
     
     DxvkOptions                 m_options;
@@ -550,6 +566,11 @@ namespace dxvk {
             uint32_t                family,
             uint32_t                index) const;
     
+    void setDebugObjectName(
+            VkObjectType            objectType,
+            uint64_t                objectHandle,
+      const char*                   name);
+
   };
   
 }
