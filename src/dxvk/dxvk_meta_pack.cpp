@@ -10,8 +10,8 @@
 
 namespace dxvk {
 
-  DxvkMetaPackObjects::DxvkMetaPackObjects(const DxvkDevice* device)
-  : m_vkd             (device->vkd()),
+  DxvkMetaPackObjects::DxvkMetaPackObjects(DxvkDevice* device)
+  : m_device          (device),
     m_sampler         (createSampler()),
     m_dsetLayoutPack  (createPackDescriptorSetLayout()),
     m_dsetLayoutUnpack(createUnpackDescriptorSetLayout()),
@@ -24,28 +24,36 @@ namespace dxvk {
     m_pipeUnpackD24S8AsD32S8(createPipeline(m_pipeLayoutUnpack, dxvk_unpack_d24s8_as_d32s8)),
     m_pipeUnpackD24S8 (createPipeline(m_pipeLayoutUnpack, dxvk_unpack_d24s8)),
     m_pipeUnpackD32S8 (createPipeline(m_pipeLayoutUnpack, dxvk_unpack_d32s8)) {
-    
+    m_device->setDebugObjectName(m_sampler, "pack_dummy_sampler");
+
+    m_device->setDebugObjectName(m_pipePackD24S8, "pack_d24s8");
+    m_device->setDebugObjectName(m_pipePackD32S8, "pack_d32s8");
+    m_device->setDebugObjectName(m_pipeUnpackD24S8AsD32S8, "unpack_d24s8_as_d32s8");
+    m_device->setDebugObjectName(m_pipeUnpackD24S8, "unpack_d24s8");
+    m_device->setDebugObjectName(m_pipeUnpackD32S8, "unpack_d32s8");
   }
 
 
   DxvkMetaPackObjects::~DxvkMetaPackObjects() {
-    m_vkd->vkDestroyPipeline(m_vkd->device(), m_pipeUnpackD32S8, nullptr);
-    m_vkd->vkDestroyPipeline(m_vkd->device(), m_pipeUnpackD24S8, nullptr);
-    m_vkd->vkDestroyPipeline(m_vkd->device(), m_pipeUnpackD24S8AsD32S8, nullptr);
+    auto vk = m_device->vkd();
 
-    m_vkd->vkDestroyPipeline(m_vkd->device(), m_pipePackD32S8, nullptr);
-    m_vkd->vkDestroyPipeline(m_vkd->device(), m_pipePackD24S8, nullptr);
+    vk->vkDestroyPipeline(vk->device(), m_pipeUnpackD32S8, nullptr);
+    vk->vkDestroyPipeline(vk->device(), m_pipeUnpackD24S8, nullptr);
+    vk->vkDestroyPipeline(vk->device(), m_pipeUnpackD24S8AsD32S8, nullptr);
+
+    vk->vkDestroyPipeline(vk->device(), m_pipePackD32S8, nullptr);
+    vk->vkDestroyPipeline(vk->device(), m_pipePackD24S8, nullptr);
     
-    m_vkd->vkDestroyDescriptorUpdateTemplate(m_vkd->device(), m_templatePack, nullptr);
-    m_vkd->vkDestroyDescriptorUpdateTemplate(m_vkd->device(), m_templateUnpack, nullptr);
+    vk->vkDestroyDescriptorUpdateTemplate(vk->device(), m_templatePack, nullptr);
+    vk->vkDestroyDescriptorUpdateTemplate(vk->device(), m_templateUnpack, nullptr);
     
-    m_vkd->vkDestroyPipelineLayout(m_vkd->device(), m_pipeLayoutPack, nullptr);
-    m_vkd->vkDestroyPipelineLayout(m_vkd->device(), m_pipeLayoutUnpack, nullptr);
+    vk->vkDestroyPipelineLayout(vk->device(), m_pipeLayoutPack, nullptr);
+    vk->vkDestroyPipelineLayout(vk->device(), m_pipeLayoutUnpack, nullptr);
     
-    m_vkd->vkDestroyDescriptorSetLayout(m_vkd->device(), m_dsetLayoutPack, nullptr);
-    m_vkd->vkDestroyDescriptorSetLayout(m_vkd->device(), m_dsetLayoutUnpack, nullptr);
+    vk->vkDestroyDescriptorSetLayout(vk->device(), m_dsetLayoutPack, nullptr);
+    vk->vkDestroyDescriptorSetLayout(vk->device(), m_dsetLayoutUnpack, nullptr);
     
-    m_vkd->vkDestroySampler(m_vkd->device(), m_sampler, nullptr);
+    vk->vkDestroySampler(vk->device(), m_sampler, nullptr);
   }
 
 
@@ -92,6 +100,8 @@ namespace dxvk {
 
 
   VkSampler DxvkMetaPackObjects::createSampler() {
+    auto vk = m_device->vkd();
+
     VkSamplerCreateInfo info = { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
     info.magFilter              = VK_FILTER_NEAREST;
     info.minFilter              = VK_FILTER_NEAREST;
@@ -103,13 +113,15 @@ namespace dxvk {
     info.unnormalizedCoordinates = VK_FALSE;
     
     VkSampler result = VK_NULL_HANDLE;
-    if (m_vkd->vkCreateSampler(m_vkd->device(), &info, nullptr, &result) != VK_SUCCESS)
+    if (vk->vkCreateSampler(vk->device(), &info, nullptr, &result) != VK_SUCCESS)
       throw DxvkError("DxvkMetaPackObjects: Failed to create sampler");
     return result;
   }
 
 
   VkDescriptorSetLayout DxvkMetaPackObjects::createPackDescriptorSetLayout() {
+    auto vk = m_device->vkd();
+
     std::array<VkDescriptorSetLayoutBinding, 3> bindings = {{
       { 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,         1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr },
       { 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, &m_sampler },
@@ -121,13 +133,15 @@ namespace dxvk {
     dsetInfo.pBindings    = bindings.data();
 
     VkDescriptorSetLayout result = VK_NULL_HANDLE;
-    if (m_vkd->vkCreateDescriptorSetLayout(m_vkd->device(), &dsetInfo, nullptr, &result) != VK_SUCCESS)
+    if (vk->vkCreateDescriptorSetLayout(vk->device(), &dsetInfo, nullptr, &result) != VK_SUCCESS)
       throw DxvkError("DxvkMetaPackObjects: Failed to create descriptor set layout");
     return result;
   }
 
 
   VkDescriptorSetLayout DxvkMetaPackObjects::createUnpackDescriptorSetLayout() {
+    auto vk = m_device->vkd();
+
     std::array<VkDescriptorSetLayoutBinding, 3> bindings = {{
       { 0, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr },
       { 1, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr },
@@ -139,7 +153,7 @@ namespace dxvk {
     dsetInfo.pBindings    = bindings.data();
 
     VkDescriptorSetLayout result = VK_NULL_HANDLE;
-    if (m_vkd->vkCreateDescriptorSetLayout(m_vkd->device(), &dsetInfo, nullptr, &result) != VK_SUCCESS)
+    if (vk->vkCreateDescriptorSetLayout(vk->device(), &dsetInfo, nullptr, &result) != VK_SUCCESS)
       throw DxvkError("DxvkMetaPackObjects: Failed to create descriptor set layout");
     return result;
   }
@@ -148,6 +162,8 @@ namespace dxvk {
   VkPipelineLayout DxvkMetaPackObjects::createPipelineLayout(
           VkDescriptorSetLayout       dsetLayout,
           uint32_t                    pushLayout) {
+    auto vk = m_device->vkd();
+
     VkPushConstantRange push = { VK_SHADER_STAGE_COMPUTE_BIT, 0, pushLayout };
 
     VkPipelineLayoutCreateInfo layoutInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
@@ -157,13 +173,15 @@ namespace dxvk {
     layoutInfo.pPushConstantRanges    = &push;
 
     VkPipelineLayout result = VK_NULL_HANDLE;
-    if (m_vkd->vkCreatePipelineLayout(m_vkd->device(), &layoutInfo, nullptr, &result) != VK_SUCCESS)
+    if (vk->vkCreatePipelineLayout(vk->device(), &layoutInfo, nullptr, &result) != VK_SUCCESS)
       throw DxvkError("DxvkMetaPackObjects: Failed to create pipeline layout");
     return result;
   }
 
 
   VkDescriptorUpdateTemplate DxvkMetaPackObjects::createPackDescriptorUpdateTemplate() {
+    auto vk = m_device->vkd();
+
     std::array<VkDescriptorUpdateTemplateEntry, 3> bindings = {{
       { 0, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,         offsetof(DxvkMetaPackDescriptors, dstBuffer),  0 },
       { 1, 0, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, offsetof(DxvkMetaPackDescriptors, srcDepth),   0 },
@@ -179,7 +197,7 @@ namespace dxvk {
     templateInfo.pipelineLayout             = m_pipeLayoutPack;
 
     VkDescriptorUpdateTemplate result = VK_NULL_HANDLE;
-    if (m_vkd->vkCreateDescriptorUpdateTemplate(m_vkd->device(),
+    if (vk->vkCreateDescriptorUpdateTemplate(vk->device(),
           &templateInfo, nullptr, &result) != VK_SUCCESS)
       throw DxvkError("DxvkMetaPackObjects: Failed to create descriptor update template");
     return result;
@@ -187,6 +205,8 @@ namespace dxvk {
 
 
   VkDescriptorUpdateTemplate DxvkMetaPackObjects::createUnpackDescriptorUpdateTemplate() {
+    auto vk = m_device->vkd();
+
     std::array<VkDescriptorUpdateTemplateEntry, 3> bindings = {{
       { 0, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, offsetof(DxvkMetaUnpackDescriptors, dstDepth),   0 },
       { 1, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, offsetof(DxvkMetaUnpackDescriptors, dstStencil), 0 },
@@ -203,7 +223,7 @@ namespace dxvk {
     templateInfo.set                        = 0;
 
     VkDescriptorUpdateTemplate result = VK_NULL_HANDLE;
-    if (m_vkd->vkCreateDescriptorUpdateTemplate(m_vkd->device(),
+    if (vk->vkCreateDescriptorUpdateTemplate(vk->device(),
           &templateInfo, nullptr, &result) != VK_SUCCESS)
       throw DxvkError("DxvkMetaPackObjects: Failed to create descriptor update template");
     return result;
@@ -213,13 +233,15 @@ namespace dxvk {
   VkPipeline DxvkMetaPackObjects::createPipeline(
           VkPipelineLayout      pipeLayout,
     const SpirvCodeBuffer&      code) {
+    auto vk = m_device->vkd();
+
     VkShaderModuleCreateInfo shaderInfo = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
     shaderInfo.codeSize = code.size();
     shaderInfo.pCode    = code.data();
 
     VkShaderModule module = VK_NULL_HANDLE;
 
-    if (m_vkd->vkCreateShaderModule(m_vkd->device(), &shaderInfo, nullptr, &module) != VK_SUCCESS)
+    if (vk->vkCreateShaderModule(vk->device(), &shaderInfo, nullptr, &module) != VK_SUCCESS)
       throw DxvkError("DxvkMetaPackObjects: Failed to create shader module");
     
     VkPipelineShaderStageCreateInfo stageInfo = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
@@ -234,10 +256,10 @@ namespace dxvk {
 
     VkPipeline result = VK_NULL_HANDLE;
 
-    VkResult status = m_vkd->vkCreateComputePipelines(
-      m_vkd->device(), VK_NULL_HANDLE, 1, &pipeInfo, nullptr, &result);
+    VkResult status = vk->vkCreateComputePipelines(
+      vk->device(), VK_NULL_HANDLE, 1, &pipeInfo, nullptr, &result);
     
-    m_vkd->vkDestroyShaderModule(m_vkd->device(), module, nullptr);
+    vk->vkDestroyShaderModule(vk->device(), module, nullptr);
 
     if (status != VK_SUCCESS)
       throw DxvkError("DxvkMetaPackObjects: Failed to create pipeline");

@@ -66,7 +66,7 @@ namespace dxvk {
 
   public:
 
-    DxvkMetaPackObjects(const DxvkDevice* device);
+    DxvkMetaPackObjects(DxvkDevice* device);
     ~DxvkMetaPackObjects();
 
     /**
@@ -90,8 +90,7 @@ namespace dxvk {
 
   private:
 
-    Rc<vk::DeviceFn>      m_vkd;
-
+    DxvkDevice*           m_device;
     VkSampler             m_sampler;
 
     VkDescriptorSetLayout m_dsetLayoutPack;
