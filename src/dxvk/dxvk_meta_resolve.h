@@ -90,7 +90,7 @@ namespace dxvk {
 
   public:
 
-    DxvkMetaResolveObjects(const DxvkDevice* device);
+    DxvkMetaResolveObjects(DxvkDevice* device);
     ~DxvkMetaResolveObjects();
 
     /**
@@ -110,7 +110,7 @@ namespace dxvk {
 
   private:
 
-    Rc<vk::DeviceFn> m_vkd;
+    DxvkDevice* m_device;
 
     VkSampler m_sampler;
 

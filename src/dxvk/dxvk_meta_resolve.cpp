@@ -52,8 +52,8 @@ namespace dxvk {
 
 
 
-  DxvkMetaResolveObjects::DxvkMetaResolveObjects(const DxvkDevice* device)
-  : m_vkd         (device->vkd()),
+  DxvkMetaResolveObjects::DxvkMetaResolveObjects(DxvkDevice* device)
+  : m_device      (device),
     m_sampler     (createSampler()),
     m_shaderFragF (device->extensions().amdShaderFragmentMask
       ? createShaderModule(dxvk_resolve_frag_f_amd)
@@ -61,10 +61,12 @@ namespace dxvk {
     m_shaderFragU (createShaderModule(dxvk_resolve_frag_u)),
     m_shaderFragI (createShaderModule(dxvk_resolve_frag_i)),
     m_shaderFragD (createShaderModule(dxvk_resolve_frag_d)) {
-    if (device->extensions().extShaderStencilExport)
+    m_device->setDebugObjectName(m_sampler, "resolve_dummy_sampler");
+
+    if (m_device->extensions().extShaderStencilExport)
       m_shaderFragDS = createShaderModule(dxvk_resolve_frag_ds);
 
-    if (device->features().vk12.shaderOutputLayer) {
+    if (m_device->features().vk12.shaderOutputLayer) {
       m_shaderVert = createShaderModule(dxvk_fullscreen_layer_vert);
     } else {
       m_shaderVert = createShaderModule(dxvk_fullscreen_vert);
@@ -74,21 +76,23 @@ namespace dxvk {
 
 
   DxvkMetaResolveObjects::~DxvkMetaResolveObjects() {
+    auto vk = m_device->vkd();
+
     for (const auto& pair : m_pipelines) {
-      m_vkd->vkDestroyPipeline(m_vkd->device(), pair.second.pipeHandle, nullptr);
-      m_vkd->vkDestroyPipelineLayout(m_vkd->device(), pair.second.pipeLayout, nullptr);
-      m_vkd->vkDestroyDescriptorSetLayout(m_vkd->device(), pair.second.dsetLayout, nullptr);
+      vk->vkDestroyPipeline(vk->device(), pair.second.pipeHandle, nullptr);
+      vk->vkDestroyPipelineLayout(vk->device(), pair.second.pipeLayout, nullptr);
+      vk->vkDestroyDescriptorSetLayout(vk->device(), pair.second.dsetLayout, nullptr);
     }
 
-    m_vkd->vkDestroyShaderModule(m_vkd->device(), m_shaderFragDS, nullptr);
-    m_vkd->vkDestroyShaderModule(m_vkd->device(), m_shaderFragD, nullptr);
-    m_vkd->vkDestroyShaderModule(m_vkd->device(), m_shaderFragF, nullptr);
-    m_vkd->vkDestroyShaderModule(m_vkd->device(), m_shaderFragI, nullptr);
-    m_vkd->vkDestroyShaderModule(m_vkd->device(), m_shaderFragU, nullptr);
-    m_vkd->vkDestroyShaderModule(m_vkd->device(), m_shaderGeom, nullptr);
-    m_vkd->vkDestroyShaderModule(m_vkd->device(), m_shaderVert, nullptr);
+    vk->vkDestroyShaderModule(vk->device(), m_shaderFragDS, nullptr);
+    vk->vkDestroyShaderModule(vk->device(), m_shaderFragD, nullptr);
+    vk->vkDestroyShaderModule(vk->device(), m_shaderFragF, nullptr);
+    vk->vkDestroyShaderModule(vk->device(), m_shaderFragI, nullptr);
+    vk->vkDestroyShaderModule(vk->device(), m_shaderFragU, nullptr);
+    vk->vkDestroyShaderModule(vk->device(), m_shaderGeom, nullptr);
+    vk->vkDestroyShaderModule(vk->device(), m_shaderVert, nullptr);
 
-    m_vkd->vkDestroySampler(m_vkd->device(), m_sampler, nullptr);
+    vk->vkDestroySampler(vk->device(), m_sampler, nullptr);
   }
 
 
@@ -116,6 +120,8 @@ namespace dxvk {
   
   
   VkSampler DxvkMetaResolveObjects::createSampler() const {
+    auto vk = m_device->vkd();
+
     VkSamplerCreateInfo info = { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
     info.magFilter              = VK_FILTER_NEAREST;
     info.minFilter              = VK_FILTER_NEAREST;
@@ -126,7 +132,7 @@ namespace dxvk {
     info.borderColor            = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
     
     VkSampler result = VK_NULL_HANDLE;
-    if (m_vkd->vkCreateSampler(m_vkd->device(), &info, nullptr, &result) != VK_SUCCESS)
+    if (vk->vkCreateSampler(vk->device(), &info, nullptr, &result) != VK_SUCCESS)
       throw DxvkError("DxvkMetaResolveObjects: Failed to create sampler");
     return result;
   }
@@ -134,12 +140,14 @@ namespace dxvk {
   
   VkShaderModule DxvkMetaResolveObjects::createShaderModule(
     const SpirvCodeBuffer&       code) const {
+    auto vk = m_device->vkd();
+
     VkShaderModuleCreateInfo info = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
     info.codeSize               = code.size();
     info.pCode                  = code.data();
     
     VkShaderModule result = VK_NULL_HANDLE;
-    if (m_vkd->vkCreateShaderModule(m_vkd->device(), &info, nullptr, &result) != VK_SUCCESS)
+    if (vk->vkCreateShaderModule(vk->device(), &info, nullptr, &result) != VK_SUCCESS)
       throw DxvkError("DxvkMetaCopyObjects: Failed to create shader module");
     return result;
   }
@@ -157,6 +165,8 @@ namespace dxvk {
 
   VkDescriptorSetLayout DxvkMetaResolveObjects::createDescriptorSetLayout(
     const DxvkMetaResolvePipelineKey& key) {
+    auto vk = m_device->vkd();
+
     std::array<VkDescriptorSetLayoutBinding, 2> bindings = {{
       { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, &m_sampler },
       { 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, &m_sampler },
@@ -167,7 +177,7 @@ namespace dxvk {
     info.pBindings = bindings.data();
 
     VkDescriptorSetLayout result = VK_NULL_HANDLE;
-    if (m_vkd->vkCreateDescriptorSetLayout(m_vkd->device(), &info, nullptr, &result) != VK_SUCCESS)
+    if (vk->vkCreateDescriptorSetLayout(vk->device(), &info, nullptr, &result) != VK_SUCCESS)
       throw DxvkError("DxvkMetaResolveObjects: Failed to create descriptor set layout");
     return result;
   }
@@ -175,6 +185,8 @@ namespace dxvk {
 
   VkPipelineLayout DxvkMetaResolveObjects::createPipelineLayout(
           VkDescriptorSetLayout  descriptorSetLayout) {
+    auto vk = m_device->vkd();
+
     VkPushConstantRange push = { VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VkOffset2D) };
 
     VkPipelineLayoutCreateInfo info = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
@@ -184,7 +196,7 @@ namespace dxvk {
     info.pPushConstantRanges    = &push;
     
     VkPipelineLayout result = VK_NULL_HANDLE;
-    if (m_vkd->vkCreatePipelineLayout(m_vkd->device(), &info, nullptr, &result) != VK_SUCCESS)
+    if (vk->vkCreatePipelineLayout(vk->device(), &info, nullptr, &result) != VK_SUCCESS)
       throw DxvkError("DxvkMetaCopyObjects: Failed to create pipeline layout");
     return result;
   }
@@ -193,6 +205,7 @@ namespace dxvk {
   VkPipeline DxvkMetaResolveObjects::createPipelineObject(
     const DxvkMetaResolvePipelineKey& key,
           VkPipelineLayout       pipelineLayout) {
+    auto vk = m_device->vkd();
     auto formatInfo = lookupFormatInfo(key.format);
 
     std::array<VkPipelineShaderStageCreateInfo, 3> stages;
@@ -324,8 +337,10 @@ namespace dxvk {
     info.basePipelineIndex      = -1;
     
     VkPipeline result = VK_NULL_HANDLE;
-    if (m_vkd->vkCreateGraphicsPipelines(m_vkd->device(), VK_NULL_HANDLE, 1, &info, nullptr, &result) != VK_SUCCESS)
-      throw DxvkError("DxvkMetaCopyObjects: Failed to create graphics pipeline");
+    if (vk->vkCreateGraphicsPipelines(vk->device(), VK_NULL_HANDLE, 1, &info, nullptr, &result) != VK_SUCCESS)
+      throw DxvkError("DxvkMetaResolveObjects: Failed to create graphics pipeline");
+
+    m_device->setDebugObjectName(result, "resolve_pipeline");
     return result;
   }
 
