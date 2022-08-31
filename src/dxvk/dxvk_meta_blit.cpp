@@ -116,14 +116,17 @@ namespace dxvk {
 
 
 
-  DxvkMetaBlitObjects::DxvkMetaBlitObjects(const DxvkDevice* device)
-  : m_vkd         (device->vkd()),
+  DxvkMetaBlitObjects::DxvkMetaBlitObjects(DxvkDevice* device)
+  : m_device      (device),
     m_samplerCopy (createSampler(VK_FILTER_NEAREST)),
     m_samplerBlit (createSampler(VK_FILTER_LINEAR)),
     m_shaderFrag1D(createShaderModule(dxvk_blit_frag_1d)),
     m_shaderFrag2D(createShaderModule(dxvk_blit_frag_2d)),
     m_shaderFrag3D(createShaderModule(dxvk_blit_frag_3d)) {
-    if (device->features().vk12.shaderOutputLayer) {
+    m_device->setDebugObjectName(m_samplerCopy, "blit_sampler_nearest");
+    m_device->setDebugObjectName(m_samplerBlit, "blit_sampler_linear");
+
+    if (m_device->features().vk12.shaderOutputLayer) {
       m_shaderVert = createShaderModule(dxvk_fullscreen_layer_vert);
     } else {
       m_shaderVert = createShaderModule(dxvk_fullscreen_vert);
@@ -133,20 +136,22 @@ namespace dxvk {
 
 
   DxvkMetaBlitObjects::~DxvkMetaBlitObjects() {
+    auto vk = m_device->vkd();
+
     for (const auto& pair : m_pipelines) {
-      m_vkd->vkDestroyPipeline(m_vkd->device(), pair.second.pipeHandle, nullptr);
-      m_vkd->vkDestroyPipelineLayout(m_vkd->device(), pair.second.pipeLayout, nullptr);
-      m_vkd->vkDestroyDescriptorSetLayout (m_vkd->device(), pair.second.dsetLayout, nullptr);
+      vk->vkDestroyPipeline(vk->device(), pair.second.pipeHandle, nullptr);
+      vk->vkDestroyPipelineLayout(vk->device(), pair.second.pipeLayout, nullptr);
+      vk->vkDestroyDescriptorSetLayout(vk->device(), pair.second.dsetLayout, nullptr);
     }
     
-    m_vkd->vkDestroyShaderModule(m_vkd->device(), m_shaderFrag3D, nullptr);
-    m_vkd->vkDestroyShaderModule(m_vkd->device(), m_shaderFrag2D, nullptr);
-    m_vkd->vkDestroyShaderModule(m_vkd->device(), m_shaderFrag1D, nullptr);
-    m_vkd->vkDestroyShaderModule(m_vkd->device(), m_shaderGeom, nullptr);
-    m_vkd->vkDestroyShaderModule(m_vkd->device(), m_shaderVert, nullptr);
+    vk->vkDestroyShaderModule(vk->device(), m_shaderFrag3D, nullptr);
+    vk->vkDestroyShaderModule(vk->device(), m_shaderFrag2D, nullptr);
+    vk->vkDestroyShaderModule(vk->device(), m_shaderFrag1D, nullptr);
+    vk->vkDestroyShaderModule(vk->device(), m_shaderGeom, nullptr);
+    vk->vkDestroyShaderModule(vk->device(), m_shaderVert, nullptr);
     
-    m_vkd->vkDestroySampler(m_vkd->device(), m_samplerBlit, nullptr);
-    m_vkd->vkDestroySampler(m_vkd->device(), m_samplerCopy, nullptr);
+    vk->vkDestroySampler(vk->device(), m_samplerBlit, nullptr);
+    vk->vkDestroySampler(vk->device(), m_samplerCopy, nullptr);
   }
   
   
@@ -179,6 +184,8 @@ namespace dxvk {
   
   
   VkSampler DxvkMetaBlitObjects::createSampler(VkFilter filter) const {
+    auto vk = m_device->vkd();
+
     VkSamplerCreateInfo info = { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
     info.magFilter              = filter;
     info.minFilter              = filter;
@@ -189,19 +196,21 @@ namespace dxvk {
     info.borderColor            = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
     
     VkSampler result = VK_NULL_HANDLE;
-    if (m_vkd->vkCreateSampler(m_vkd->device(), &info, nullptr, &result) != VK_SUCCESS)
+    if (vk->vkCreateSampler(vk->device(), &info, nullptr, &result) != VK_SUCCESS)
       throw DxvkError("DxvkMetaBlitObjects: Failed to create sampler");
     return result;
   }
   
   
   VkShaderModule DxvkMetaBlitObjects::createShaderModule(const SpirvCodeBuffer& code) const {
+    auto vk = m_device->vkd();
+
     VkShaderModuleCreateInfo info = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
     info.codeSize               = code.size();
     info.pCode                  = code.data();
     
     VkShaderModule result = VK_NULL_HANDLE;
-    if (m_vkd->vkCreateShaderModule(m_vkd->device(), &info, nullptr, &result) != VK_SUCCESS)
+    if (vk->vkCreateShaderModule(vk->device(), &info, nullptr, &result) != VK_SUCCESS)
       throw DxvkError("DxvkMetaBlitObjects: Failed to create shader module");
     return result;
   }
@@ -220,6 +229,8 @@ namespace dxvk {
   
   VkDescriptorSetLayout DxvkMetaBlitObjects::createDescriptorSetLayout(
           VkImageViewType             viewType) const {
+    auto vk = m_device->vkd();
+
     VkDescriptorSetLayoutBinding binding = { 0,
       VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT };
     
@@ -228,7 +239,7 @@ namespace dxvk {
     info.pBindings              = &binding;
     
     VkDescriptorSetLayout result = VK_NULL_HANDLE;
-    if (m_vkd->vkCreateDescriptorSetLayout(m_vkd->device(), &info, nullptr, &result) != VK_SUCCESS)
+    if (vk->vkCreateDescriptorSetLayout(vk->device(), &info, nullptr, &result) != VK_SUCCESS)
       throw DxvkError("DxvkMetaBlitObjects: Failed to create descriptor set layout");
     return result;
   }
@@ -236,6 +247,8 @@ namespace dxvk {
   
   VkPipelineLayout DxvkMetaBlitObjects::createPipelineLayout(
           VkDescriptorSetLayout       descriptorSetLayout) const {
+    auto vk = m_device->vkd();
+
     VkPushConstantRange pushRange = { VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(DxvkMetaBlitPushConstants) };
     
     VkPipelineLayoutCreateInfo info = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
@@ -245,7 +258,7 @@ namespace dxvk {
     info.pPushConstantRanges    = &pushRange;
     
     VkPipelineLayout result = VK_NULL_HANDLE;
-    if (m_vkd->vkCreatePipelineLayout(m_vkd->device(), &info, nullptr, &result) != VK_SUCCESS)
+    if (vk->vkCreatePipelineLayout(vk->device(), &info, nullptr, &result) != VK_SUCCESS)
       throw DxvkError("DxvkMetaBlitObjects: Failed to create pipeline layout");
     return result;
   }
@@ -256,6 +269,8 @@ namespace dxvk {
           VkImageViewType             imageViewType,
           VkFormat                    format,
           VkSampleCountFlagBits       samples) const {
+    auto vk = m_device->vkd();
+
     std::array<VkPipelineShaderStageCreateInfo, 3> stages;
     uint32_t stageCount = 0;
     
@@ -337,8 +352,10 @@ namespace dxvk {
     info.basePipelineIndex      = -1;
     
     VkPipeline result = VK_NULL_HANDLE;
-    if (m_vkd->vkCreateGraphicsPipelines(m_vkd->device(), VK_NULL_HANDLE, 1, &info, nullptr, &result) != VK_SUCCESS)
+    if (vk->vkCreateGraphicsPipelines(vk->device(), VK_NULL_HANDLE, 1, &info, nullptr, &result) != VK_SUCCESS)
       throw DxvkError("DxvkMetaBlitObjects: Failed to create graphics pipeline");
+
+    m_device->setDebugObjectName(result, "blit_pipeline");
     return result;
   }
   

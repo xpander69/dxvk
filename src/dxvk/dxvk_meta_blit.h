@@ -143,7 +143,7 @@ namespace dxvk {
     
   public:
     
-    DxvkMetaBlitObjects(const DxvkDevice* device);
+    DxvkMetaBlitObjects(DxvkDevice* device);
     ~DxvkMetaBlitObjects();
     
     /**
@@ -169,8 +169,8 @@ namespace dxvk {
             VkFilter              filter);
     
   private:
-    
-    Rc<vk::DeviceFn>  m_vkd;
+
+    DxvkDevice* m_device;
     
     VkSampler m_samplerCopy;
     VkSampler m_samplerBlit;
