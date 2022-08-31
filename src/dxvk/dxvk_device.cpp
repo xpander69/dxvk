@@ -23,6 +23,15 @@ namespace dxvk {
     m_queues.graphics = getQueue(queueFamilies.graphics, 0);
     m_queues.transfer = getQueue(queueFamilies.transfer, 0);
     m_queues.sparse = getQueue(queueFamilies.sparse, 0);
+
+    setDebugObjectName(m_queues.graphics.queueHandle, "graphics_queue");
+
+    if (m_queues.transfer.queueHandle != m_queues.graphics.queueHandle)
+      setDebugObjectName(m_queues.graphics.queueHandle, "transfer_queue");
+
+    if (m_queues.sparse.queueHandle != m_queues.graphics.queueHandle
+     && m_queues.sparse.queueHandle != m_queues.transfer.queueHandle)
+      setDebugObjectName(m_queues.graphics.queueHandle, "sparse_queue");
   }
   
   

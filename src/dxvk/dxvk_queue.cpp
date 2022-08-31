@@ -16,6 +16,8 @@ namespace dxvk {
 
     if (vk->vkCreateSemaphore(vk->device(), &info, nullptr, &m_semaphore))
       throw DxvkError("Failed to create global timeline semaphore");
+
+    m_device->setDebugObjectName(m_semaphore, "graphics_timeline");
   }
   
   
