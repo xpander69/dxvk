@@ -47,7 +47,7 @@ namespace dxvk {
     
   public:
     
-    DxvkMetaClearObjects(const DxvkDevice* device);
+    DxvkMetaClearObjects(DxvkDevice* device);
     ~DxvkMetaClearObjects();
     
     /**
@@ -85,7 +85,7 @@ namespace dxvk {
       VkPipeline clearImg2DArray = VK_NULL_HANDLE;
     };
     
-    Rc<vk::DeviceFn> m_vkd;
+    DxvkDevice* m_device;
     
     VkDescriptorSetLayout m_clearBufDsetLayout = VK_NULL_HANDLE;
     VkDescriptorSetLayout m_clearImgDsetLayout = VK_NULL_HANDLE;

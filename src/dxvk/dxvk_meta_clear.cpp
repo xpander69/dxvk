@@ -16,8 +16,8 @@
 
 namespace dxvk {
   
-  DxvkMetaClearObjects::DxvkMetaClearObjects(const DxvkDevice* device)
-  : m_vkd(device->vkd()) {
+  DxvkMetaClearObjects::DxvkMetaClearObjects(DxvkDevice* device)
+  : m_device(device) {
     // Create descriptor set layouts
     m_clearBufDsetLayout = createDescriptorSetLayout(VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER);
     m_clearImgDsetLayout = createDescriptorSetLayout(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
@@ -45,29 +45,30 @@ namespace dxvk {
   
   
   DxvkMetaClearObjects::~DxvkMetaClearObjects() {
-    // Destroy pipelines
-    m_vkd->vkDestroyPipeline(m_vkd->device(), m_clearPipesF32.clearBuf, nullptr);
-    m_vkd->vkDestroyPipeline(m_vkd->device(), m_clearPipesU32.clearBuf, nullptr);
+    auto vk = m_device->vkd();
+
+    vk->vkDestroyPipeline(vk->device(), m_clearPipesF32.clearBuf, nullptr);
+    vk->vkDestroyPipeline(vk->device(), m_clearPipesU32.clearBuf, nullptr);
     
-    m_vkd->vkDestroyPipeline(m_vkd->device(), m_clearPipesF32.clearImg1D, nullptr);
-    m_vkd->vkDestroyPipeline(m_vkd->device(), m_clearPipesU32.clearImg1D, nullptr);
-    m_vkd->vkDestroyPipeline(m_vkd->device(), m_clearPipesF32.clearImg2D, nullptr);
-    m_vkd->vkDestroyPipeline(m_vkd->device(), m_clearPipesU32.clearImg2D, nullptr);
-    m_vkd->vkDestroyPipeline(m_vkd->device(), m_clearPipesF32.clearImg3D, nullptr);
-    m_vkd->vkDestroyPipeline(m_vkd->device(), m_clearPipesU32.clearImg3D, nullptr);
+    vk->vkDestroyPipeline(vk->device(), m_clearPipesF32.clearImg1D, nullptr);
+    vk->vkDestroyPipeline(vk->device(), m_clearPipesU32.clearImg1D, nullptr);
+    vk->vkDestroyPipeline(vk->device(), m_clearPipesF32.clearImg2D, nullptr);
+    vk->vkDestroyPipeline(vk->device(), m_clearPipesU32.clearImg2D, nullptr);
+    vk->vkDestroyPipeline(vk->device(), m_clearPipesF32.clearImg3D, nullptr);
+    vk->vkDestroyPipeline(vk->device(), m_clearPipesU32.clearImg3D, nullptr);
     
-    m_vkd->vkDestroyPipeline(m_vkd->device(), m_clearPipesF32.clearImg1DArray, nullptr);
-    m_vkd->vkDestroyPipeline(m_vkd->device(), m_clearPipesU32.clearImg1DArray, nullptr);
-    m_vkd->vkDestroyPipeline(m_vkd->device(), m_clearPipesF32.clearImg2DArray, nullptr);
-    m_vkd->vkDestroyPipeline(m_vkd->device(), m_clearPipesU32.clearImg2DArray, nullptr);
+    vk->vkDestroyPipeline(vk->device(), m_clearPipesF32.clearImg1DArray, nullptr);
+    vk->vkDestroyPipeline(vk->device(), m_clearPipesU32.clearImg1DArray, nullptr);
+    vk->vkDestroyPipeline(vk->device(), m_clearPipesF32.clearImg2DArray, nullptr);
+    vk->vkDestroyPipeline(vk->device(), m_clearPipesU32.clearImg2DArray, nullptr);
     
     // Destroy pipeline layouts
-    m_vkd->vkDestroyPipelineLayout(m_vkd->device(), m_clearBufPipeLayout, nullptr);
-    m_vkd->vkDestroyPipelineLayout(m_vkd->device(), m_clearImgPipeLayout, nullptr);
+    vk->vkDestroyPipelineLayout(vk->device(), m_clearBufPipeLayout, nullptr);
+    vk->vkDestroyPipelineLayout(vk->device(), m_clearImgPipeLayout, nullptr);
     
     // Destroy descriptor set layouts
-    m_vkd->vkDestroyDescriptorSetLayout(m_vkd->device(), m_clearBufDsetLayout, nullptr);
-    m_vkd->vkDestroyDescriptorSetLayout(m_vkd->device(), m_clearImgDsetLayout, nullptr);
+    vk->vkDestroyDescriptorSetLayout(vk->device(), m_clearBufDsetLayout, nullptr);
+    vk->vkDestroyDescriptorSetLayout(vk->device(), m_clearImgDsetLayout, nullptr);
   }
   
   
@@ -116,6 +117,8 @@ namespace dxvk {
   
   VkDescriptorSetLayout DxvkMetaClearObjects::createDescriptorSetLayout(
           VkDescriptorType        descriptorType) {
+    auto vk = m_device->vkd();
+
     VkDescriptorSetLayoutBinding bindInfo = { 0, descriptorType, 1, VK_SHADER_STAGE_COMPUTE_BIT };
     
     VkDescriptorSetLayoutCreateInfo dsetInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
@@ -123,7 +126,7 @@ namespace dxvk {
     dsetInfo.pBindings          = &bindInfo;
     
     VkDescriptorSetLayout result = VK_NULL_HANDLE;
-    if (m_vkd->vkCreateDescriptorSetLayout(m_vkd->device(),
+    if (vk->vkCreateDescriptorSetLayout(vk->device(),
           &dsetInfo, nullptr, &result) != VK_SUCCESS)
       throw DxvkError("Dxvk: Failed to create meta clear descriptor set layout");
     return result;
@@ -132,6 +135,8 @@ namespace dxvk {
   
   VkPipelineLayout DxvkMetaClearObjects::createPipelineLayout(
           VkDescriptorSetLayout   dsetLayout) {
+    auto vk = m_device->vkd();
+
     VkPushConstantRange pushInfo = { VK_SHADER_STAGE_COMPUTE_BIT, 0, uint32_t(sizeof(DxvkMetaClearArgs)) };
     
     VkPipelineLayoutCreateInfo pipeInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
@@ -141,7 +146,7 @@ namespace dxvk {
     pipeInfo.pPushConstantRanges    = &pushInfo;
     
     VkPipelineLayout result = VK_NULL_HANDLE;
-    if (m_vkd->vkCreatePipelineLayout(m_vkd->device(),
+    if (vk->vkCreatePipelineLayout(vk->device(),
           &pipeInfo, nullptr, &result) != VK_SUCCESS)
       throw DxvkError("Dxvk: Failed to create meta clear pipeline layout");
     return result;
@@ -151,12 +156,14 @@ namespace dxvk {
   VkPipeline DxvkMetaClearObjects::createPipeline(
     const SpirvCodeBuffer&        spirvCode,
           VkPipelineLayout        pipeLayout) {
+    auto vk = m_device->vkd();
+
     VkShaderModuleCreateInfo shaderInfo = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
     shaderInfo.codeSize           = spirvCode.size();
     shaderInfo.pCode              = spirvCode.data();
     
     VkShaderModule shaderModule = VK_NULL_HANDLE;
-    if (m_vkd->vkCreateShaderModule(m_vkd->device(),
+    if (vk->vkCreateShaderModule(vk->device(),
           &shaderInfo, nullptr, &shaderModule) != VK_SUCCESS)
       throw DxvkError("Dxvk: Failed to create meta clear shader module");
     
@@ -173,13 +180,15 @@ namespace dxvk {
     
     VkPipeline result = VK_NULL_HANDLE;
     
-    const VkResult status = m_vkd->vkCreateComputePipelines(
-      m_vkd->device(), VK_NULL_HANDLE, 1, &pipeInfo, nullptr, &result);
+    const VkResult status = vk->vkCreateComputePipelines(
+      vk->device(), VK_NULL_HANDLE, 1, &pipeInfo, nullptr, &result);
     
-    m_vkd->vkDestroyShaderModule(m_vkd->device(), shaderModule, nullptr);
+    vk->vkDestroyShaderModule(vk->device(), shaderModule, nullptr);
     
     if (status != VK_SUCCESS)
       throw DxvkError("Dxvk: Failed to create meta clear compute pipeline");
+
+    m_device->setDebugObjectName(result, "clear_pipeline");
     return result;
   }
   
