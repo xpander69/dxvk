@@ -79,8 +79,8 @@ namespace dxvk {
   }
 
   
-  DxvkMetaCopyObjects::DxvkMetaCopyObjects(const DxvkDevice* device)
-  : m_vkd         (device->vkd()),
+  DxvkMetaCopyObjects::DxvkMetaCopyObjects(DxvkDevice* device)
+  : m_device(device),
     m_color {
       createShaderModule(dxvk_copy_color_1d),
       createShaderModule(dxvk_copy_color_2d),
@@ -89,14 +89,14 @@ namespace dxvk {
       createShaderModule(dxvk_copy_depth_1d),
       createShaderModule(dxvk_copy_depth_2d),
       createShaderModule(dxvk_copy_depth_ms) } {
-    if (device->features().vk12.shaderOutputLayer) {
+    if (m_device->features().vk12.shaderOutputLayer) {
       m_shaderVert = createShaderModule(dxvk_fullscreen_layer_vert);
     } else {
       m_shaderVert = createShaderModule(dxvk_fullscreen_vert);
       m_shaderGeom = createShaderModule(dxvk_fullscreen_geom);
     }
     
-    if (device->extensions().extShaderStencilExport) {
+    if (m_device->extensions().extShaderStencilExport) {
       m_depthStencil = {
         createShaderModule(dxvk_copy_depth_stencil_1d),
         createShaderModule(dxvk_copy_depth_stencil_2d),
@@ -106,27 +106,29 @@ namespace dxvk {
 
 
   DxvkMetaCopyObjects::~DxvkMetaCopyObjects() {
-    m_vkd->vkDestroyPipeline(m_vkd->device(), m_copyBufferImagePipeline.pipeHandle, nullptr);
-    m_vkd->vkDestroyPipelineLayout(m_vkd->device(), m_copyBufferImagePipeline.pipeLayout, nullptr);
-    m_vkd->vkDestroyDescriptorSetLayout(m_vkd->device(), m_copyBufferImagePipeline.dsetLayout, nullptr);
+    auto vk = m_device->vkd();
+
+    vk->vkDestroyPipeline(vk->device(), m_copyBufferImagePipeline.pipeHandle, nullptr);
+    vk->vkDestroyPipelineLayout(vk->device(), m_copyBufferImagePipeline.pipeLayout, nullptr);
+    vk->vkDestroyDescriptorSetLayout(vk->device(), m_copyBufferImagePipeline.dsetLayout, nullptr);
 
     for (const auto& pair : m_pipelines) {
-      m_vkd->vkDestroyPipeline(m_vkd->device(), pair.second.pipeHandle, nullptr);
-      m_vkd->vkDestroyPipelineLayout(m_vkd->device(), pair.second.pipeLayout, nullptr);
-      m_vkd->vkDestroyDescriptorSetLayout (m_vkd->device(), pair.second.dsetLayout, nullptr);
+      vk->vkDestroyPipeline(vk->device(), pair.second.pipeHandle, nullptr);
+      vk->vkDestroyPipelineLayout(vk->device(), pair.second.pipeLayout, nullptr);
+      vk->vkDestroyDescriptorSetLayout(vk->device(), pair.second.dsetLayout, nullptr);
     }
 
-    m_vkd->vkDestroyShaderModule(m_vkd->device(), m_depthStencil.fragMs, nullptr);
-    m_vkd->vkDestroyShaderModule(m_vkd->device(), m_depthStencil.frag2D, nullptr);
-    m_vkd->vkDestroyShaderModule(m_vkd->device(), m_depthStencil.frag1D, nullptr);
-    m_vkd->vkDestroyShaderModule(m_vkd->device(), m_depth.fragMs, nullptr);
-    m_vkd->vkDestroyShaderModule(m_vkd->device(), m_depth.frag2D, nullptr);
-    m_vkd->vkDestroyShaderModule(m_vkd->device(), m_depth.frag1D, nullptr);
-    m_vkd->vkDestroyShaderModule(m_vkd->device(), m_color.fragMs, nullptr);
-    m_vkd->vkDestroyShaderModule(m_vkd->device(), m_color.frag2D, nullptr);
-    m_vkd->vkDestroyShaderModule(m_vkd->device(), m_color.frag1D, nullptr);
-    m_vkd->vkDestroyShaderModule(m_vkd->device(), m_shaderGeom,   nullptr);
-    m_vkd->vkDestroyShaderModule(m_vkd->device(), m_shaderVert,   nullptr);
+    vk->vkDestroyShaderModule(vk->device(), m_depthStencil.fragMs, nullptr);
+    vk->vkDestroyShaderModule(vk->device(), m_depthStencil.frag2D, nullptr);
+    vk->vkDestroyShaderModule(vk->device(), m_depthStencil.frag1D, nullptr);
+    vk->vkDestroyShaderModule(vk->device(), m_depth.fragMs, nullptr);
+    vk->vkDestroyShaderModule(vk->device(), m_depth.frag2D, nullptr);
+    vk->vkDestroyShaderModule(vk->device(), m_depth.frag1D, nullptr);
+    vk->vkDestroyShaderModule(vk->device(), m_color.fragMs, nullptr);
+    vk->vkDestroyShaderModule(vk->device(), m_color.frag2D, nullptr);
+    vk->vkDestroyShaderModule(vk->device(), m_color.frag1D, nullptr);
+    vk->vkDestroyShaderModule(vk->device(), m_shaderGeom,   nullptr);
+    vk->vkDestroyShaderModule(vk->device(), m_shaderVert,   nullptr);
   }
 
 
@@ -192,18 +194,22 @@ namespace dxvk {
   
   VkShaderModule DxvkMetaCopyObjects::createShaderModule(
     const SpirvCodeBuffer&          code) const {
+    auto vk = m_device->vkd();
+
     VkShaderModuleCreateInfo info = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
     info.codeSize               = code.size();
     info.pCode                  = code.data();
     
     VkShaderModule result = VK_NULL_HANDLE;
-    if (m_vkd->vkCreateShaderModule(m_vkd->device(), &info, nullptr, &result) != VK_SUCCESS)
+    if (vk->vkCreateShaderModule(vk->device(), &info, nullptr, &result) != VK_SUCCESS)
       throw DxvkError("DxvkMetaCopyObjects: Failed to create shader module");
     return result;
   }
 
   
   DxvkMetaCopyPipeline DxvkMetaCopyObjects::createCopyBufferImagePipeline() {
+    auto vk = m_device->vkd();
+
     DxvkMetaCopyPipeline pipeline;
 
     std::array<VkDescriptorSetLayoutBinding, 2> bindings = {{
@@ -215,7 +221,7 @@ namespace dxvk {
     setLayoutInfo.bindingCount = bindings.size();
     setLayoutInfo.pBindings = bindings.data();
 
-    if (m_vkd->vkCreateDescriptorSetLayout(m_vkd->device(), &setLayoutInfo, nullptr, &pipeline.dsetLayout) != VK_SUCCESS)
+    if (vk->vkCreateDescriptorSetLayout(vk->device(), &setLayoutInfo, nullptr, &pipeline.dsetLayout) != VK_SUCCESS)
       throw DxvkError("DxvkMetaCopyObjects: Failed to create descriptor set layout");
 
     VkPushConstantRange pushRange = { VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(DxvkCopyBufferImageArgs) };
@@ -226,7 +232,7 @@ namespace dxvk {
     pipelineLayoutInfo.pushConstantRangeCount = 1;
     pipelineLayoutInfo.pPushConstantRanges = &pushRange;
 
-    if (m_vkd->vkCreatePipelineLayout(m_vkd->device(), &pipelineLayoutInfo, nullptr, &pipeline.pipeLayout) != VK_SUCCESS)
+    if (vk->vkCreatePipelineLayout(vk->device(), &pipelineLayoutInfo, nullptr, &pipeline.pipeLayout) != VK_SUCCESS)
       throw DxvkError("DxvkMetaCopyObjects: Failed to create pipeline layout");
 
     VkShaderModule shaderModule = createShaderModule(dxvk_copy_buffer_image);
@@ -239,11 +245,13 @@ namespace dxvk {
     pipelineInfo.stage.pName = "main";
     pipelineInfo.basePipelineIndex = -1;
 
-    if (m_vkd->vkCreateComputePipelines(m_vkd->device(), VK_NULL_HANDLE,
+    if (vk->vkCreateComputePipelines(vk->device(), VK_NULL_HANDLE,
         1, &pipelineInfo, nullptr, &pipeline.pipeHandle) != VK_SUCCESS)
       throw DxvkError("DxvkMetaCopyObjects: Failed to create compute pipeline");
 
-    m_vkd->vkDestroyShaderModule(m_vkd->device(), shaderModule, nullptr);
+    vk->vkDestroyShaderModule(vk->device(), shaderModule, nullptr);
+
+    m_device->setDebugObjectName(pipeline.pipeHandle, "copy_buffer_image_pipeline");
     return pipeline;
   }
 
@@ -260,6 +268,8 @@ namespace dxvk {
 
   VkDescriptorSetLayout DxvkMetaCopyObjects::createDescriptorSetLayout(
     const DxvkMetaCopyPipelineKey&  key) const {
+    auto vk = m_device->vkd();
+
     std::array<VkDescriptorSetLayoutBinding, 2> bindings = {{
       { 0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT },
       { 1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT },
@@ -270,7 +280,7 @@ namespace dxvk {
     info.pBindings = bindings.data();
 
     VkDescriptorSetLayout result = VK_NULL_HANDLE;
-    if (m_vkd->vkCreateDescriptorSetLayout(m_vkd->device(), &info, nullptr, &result) != VK_SUCCESS)
+    if (vk->vkCreateDescriptorSetLayout(vk->device(), &info, nullptr, &result) != VK_SUCCESS)
       throw DxvkError("DxvkMetaCopyObjects: Failed to create descriptor set layout");
     return result;
   }
@@ -278,6 +288,8 @@ namespace dxvk {
   
   VkPipelineLayout DxvkMetaCopyObjects::createPipelineLayout(
           VkDescriptorSetLayout     descriptorSetLayout) const {
+    auto vk = m_device->vkd();
+
     VkPushConstantRange push = { VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(VkOffset2D) };
 
     VkPipelineLayoutCreateInfo info = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
@@ -287,7 +299,7 @@ namespace dxvk {
     info.pPushConstantRanges    = &push;
     
     VkPipelineLayout result = VK_NULL_HANDLE;
-    if (m_vkd->vkCreatePipelineLayout(m_vkd->device(), &info, nullptr, &result) != VK_SUCCESS)
+    if (vk->vkCreatePipelineLayout(vk->device(), &info, nullptr, &result) != VK_SUCCESS)
       throw DxvkError("DxvkMetaCopyObjects: Failed to create pipeline layout");
     return result;
   }
@@ -296,6 +308,7 @@ namespace dxvk {
   VkPipeline DxvkMetaCopyObjects::createPipelineObject(
     const DxvkMetaCopyPipelineKey&  key,
           VkPipelineLayout          pipelineLayout) {
+    auto vk = m_device->vkd();
     auto aspect = lookupFormatInfo(key.format)->aspectMask;
 
     std::array<VkPipelineShaderStageCreateInfo, 3> stages;
@@ -422,8 +435,11 @@ namespace dxvk {
     info.basePipelineIndex      = -1;
     
     VkPipeline result = VK_NULL_HANDLE;
-    if (m_vkd->vkCreateGraphicsPipelines(m_vkd->device(), VK_NULL_HANDLE, 1, &info, nullptr, &result) != VK_SUCCESS)
+
+    if (vk->vkCreateGraphicsPipelines(vk->device(), VK_NULL_HANDLE, 1, &info, nullptr, &result) != VK_SUCCESS)
       throw DxvkError("DxvkMetaCopyObjects: Failed to create graphics pipeline");
+
+    m_device->setDebugObjectName(result, "copy_pipeline");
     return result;
   }
   

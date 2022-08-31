@@ -113,7 +113,7 @@ namespace dxvk {
 
   public:
 
-    DxvkMetaCopyObjects(const DxvkDevice* device);
+    DxvkMetaCopyObjects(DxvkDevice* device);
     ~DxvkMetaCopyObjects();
 
     /**
@@ -157,7 +157,7 @@ namespace dxvk {
       VkShaderModule fragMs = VK_NULL_HANDLE;
     };
 
-    Rc<vk::DeviceFn> m_vkd;
+    DxvkDevice* m_device;
 
     VkShaderModule m_shaderVert = VK_NULL_HANDLE;
     VkShaderModule m_shaderGeom = VK_NULL_HANDLE;
