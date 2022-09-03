@@ -343,6 +343,9 @@ namespace dxvk {
     extensionsEnabled.merge(m_extraExtensions);
     DxvkNameList extensionNameList = extensionsEnabled.toNameList();
 
+    // Always enable robust buffer access
+    enabledFeatures.core.features.robustBufferAccess = VK_TRUE;
+
     // Optionally used by some client API extensions
     enabledFeatures.vk12.drawIndirectCount =
       m_deviceFeatures.vk12.drawIndirectCount;
@@ -378,6 +381,10 @@ namespace dxvk {
     // that graphicsPipelineLibraryIndependentInterpolationDecoration is supported
     enabledFeatures.extGraphicsPipelineLibrary.graphicsPipelineLibrary =
       m_deviceFeatures.extGraphicsPipelineLibrary.graphicsPipelineLibrary;
+
+    // Enable memory priority if supported to improve memory management
+    enabledFeatures.extMemoryPriority.memoryPriority =
+      m_deviceFeatures.extMemoryPriority.memoryPriority;
 
     // Require robustBufferAccess2 since we use the robustness alignment
     // info in a number of places, and require null descriptor support
