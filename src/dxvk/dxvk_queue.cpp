@@ -109,11 +109,20 @@ namespace dxvk {
     // is infinite. Work around this by spinning.
     VkResult vr = VK_TIMEOUT;
 
-    while (vr == VK_TIMEOUT)
+    while (vr == VK_TIMEOUT) {
+      auto t0 = dxvk::high_resolution_clock::now();
       vr = vk->vkWaitSemaphores(vk->device(), &waitInfo, ~0ull);
+      auto t1 = dxvk::high_resolution_clock::now();
+      auto us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0);
+      Logger::err(str::format("vkWaitSemaphores(", semaphoreValue, "): vr = ", vr, " (", us.count(), " us)"));
+    }
 
     if (vr)
       Logger::err(str::format("Failed to synchronize with global timeline semaphore: ", vr));
+
+    uint64_t value = 0ull;
+    vk->vkGetSemaphoreCounterValue(vk->device(), m_semaphore, &value);
+    Logger::err(str::format("vkGetSemaphoreCounterValue: ", value));
 
     return vr;
   }

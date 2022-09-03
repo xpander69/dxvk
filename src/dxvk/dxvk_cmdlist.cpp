@@ -289,7 +289,13 @@ namespace dxvk {
       }
 
       // Finally, submit all graphics commands of the current submission
-      if ((status = m_commandSubmission.submit(m_device, graphics.queueHandle)))
+      auto t0 = dxvk::high_resolution_clock::now();
+      status = m_commandSubmission.submit(m_device, graphics.queueHandle);
+      auto t1 = dxvk::high_resolution_clock::now();
+      auto us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0);
+      Logger::err(str::format("vkQueueSubmit(", semaphoreValue, "): vr = ", status, " (", us.count(), " us)"));
+
+      if (status)
         return status;
     }
 

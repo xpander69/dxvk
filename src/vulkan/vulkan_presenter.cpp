@@ -42,9 +42,13 @@ namespace dxvk::vk {
 
     // Don't acquire more than one image at a time
     if (m_acquireStatus == VK_NOT_READY) {
+      auto t0 = dxvk::high_resolution_clock::now();
       m_acquireStatus = m_vkd->vkAcquireNextImageKHR(m_vkd->device(),
         m_swapchain, std::numeric_limits<uint64_t>::max(),
         sync.acquire, VK_NULL_HANDLE, &m_imageIndex);
+      auto t1 = dxvk::high_resolution_clock::now();
+      auto us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0);
+      Logger::err(str::format("vkAcquireNextImageKHR: vr = ", m_acquireStatus, " (", us.count(), " us)"));
     }
     
     if (m_acquireStatus != VK_SUCCESS && m_acquireStatus != VK_SUBOPTIMAL_KHR)
@@ -65,7 +69,11 @@ namespace dxvk::vk {
     info.pSwapchains        = &m_swapchain;
     info.pImageIndices      = &m_imageIndex;
 
+    auto t0 = dxvk::high_resolution_clock::now();
     VkResult status = m_vkd->vkQueuePresentKHR(m_device.queue, &info);
+    auto t1 = dxvk::high_resolution_clock::now();
+    auto us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0);
+    Logger::err(str::format("vkQueuePresentKHR: vr = ", status, " (", us.count(), " us)"));
 
     if (status != VK_SUCCESS && status != VK_SUBOPTIMAL_KHR)
       return status;
@@ -77,9 +85,13 @@ namespace dxvk::vk {
 
     sync = m_semaphores.at(m_frameIndex);
 
+    t0 = dxvk::high_resolution_clock::now();
     m_acquireStatus = m_vkd->vkAcquireNextImageKHR(m_vkd->device(),
       m_swapchain, std::numeric_limits<uint64_t>::max(),
       sync.acquire, VK_NULL_HANDLE, &m_imageIndex);
+    t1 = dxvk::high_resolution_clock::now();
+    us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0);
+    Logger::err(str::format("vkAcquireNextImageKHR: vr = ", m_acquireStatus, " (", us.count(), " us)"));
 
     bool vsync = m_info.presentMode == VK_PRESENT_MODE_FIFO_KHR
               || m_info.presentMode == VK_PRESENT_MODE_FIFO_RELAXED_KHR;
