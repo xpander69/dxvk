@@ -135,3 +135,4 @@ dxvk_version = vcs_tag(
 )
 
 subdir('src')
+subdir('samples')
