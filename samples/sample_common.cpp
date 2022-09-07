@@ -11,36 +11,64 @@ static LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARA
       return 0;
   }
 
-  return DefWindowProcW(hWnd, message, wParam, lParam);
+  return DefWindowProcA(hWnd, message, wParam, lParam);
 }
 
-BaseTestApp::BaseTestApp(HINSTANCE instance, const char* title, int w, int h)
-  : m_instance(instance) {
-  WNDCLASSEXA wc   = { };
-  wc.cbSize        = sizeof(wc);
-  wc.style         = CS_HREDRAW | CS_VREDRAW;
-  wc.lpfnWndProc   = WindowProc;
-  wc.hInstance     = instance;
-  wc.hCursor       = LoadCursor(nullptr, IDC_ARROW);
-  wc.hbrBackground = HBRUSH(COLOR_WINDOW);
-  wc.lpszClassName = "WindowClass";
-  RegisterClassExW(&wc);
-
-  m_window = CreateWindowExA(0, "WindowClass", title,
-    WS_OVERLAPPEDWINDOW,
-    CW_USEDEFAULT, CW_USEDEFAULT,
-    w, h,
-    nullptr, nullptr, instance, nullptr);
-  ShowWindow(m_window, nCmdShow);
+static int mainLoop(ISampleApp *sample) {
+  while (true) {
+    MSG msg;
+    if (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
+      TranslateMessage(&msg);
+      DispatchMessageW(&msg);
+      
+      if (msg.message == WM_QUIT)
+        return 0;
+    } else {
+      if (!sample->frame())
+        return 0;
+    }
+  }
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-  return run_test(hInstance);
+  auto sample = ISampleApp::create();
+  if (!sample) {
+    std::cerr << "Failed to create sample" << std::endl;
+    return 1;
+  }
+
+  WNDCLASSEXA wc = { };
+  wc.cbSize        = sizeof(wc);
+  wc.style         = CS_HREDRAW | CS_VREDRAW;
+  wc.lpfnWndProc   = WindowProc;
+  wc.hInstance     = hInstance;
+  wc.hCursor       = LoadCursor(nullptr, IDC_ARROW);
+  wc.hbrBackground = HBRUSH(COLOR_WINDOW);
+  wc.lpszClassName = "DXVKSampleWindow";
+  RegisterClassExA(&wc);
+
+  HWND window = CreateWindowExA(0, "DXVKSampleWindow", sample->title(),
+      WS_OVERLAPPEDWINDOW,
+      CW_USEDEFAULT, CW_USEDEFAULT,
+      sample->defaultWidth(), sample->defaultHeight(),
+      nullptr, nullptr, hInstance, nullptr );
+  if (!window) {
+    std::cerr << "Failed to create window: " << GetLastError() << std::endl;
+    return 1;
+  }
+  ShowWindow(window, nCmdShow);
+
+  if (!sample->init(window)) {
+    std::cerr << "Failed to init sample" << std::endl;
+    return 1;
+  }
+
+  return mainLoop(sample.get());
 }
 #else
 #include <SDL2/SDL.h>
 
-static int mainLoop(ISampleApp *sample) {
+static int mainLoop(ISampleApp* sample) {
   bool running = true;
   while (running) {
     SDL_Event event;

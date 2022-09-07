@@ -1,6 +1,8 @@
 #pragma once
 
 #include <windows.h>
+#define _USE_MATH_DEFINES
+#include <cmath>
 #include <memory>
 #include "../src/util/com/com_pointer.h"
 

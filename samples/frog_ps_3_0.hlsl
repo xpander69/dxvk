@@ -1,14 +1,16 @@
 struct VS_OUTPUT {
   float4 Position : POSITION;
+  float2 UV       : TEXCOORD0;
 };
 
 struct PS_OUTPUT {
-  float4 Colour   : COLOR;
+  float4 Colour : COLOR;
 };
-sampler g_texDepth : register( s0 );
-PS_OUTPUT main( VS_OUTPUT IN ) {
+
+sampler s_Texture : register(s0);
+
+PS_OUTPUT main(VS_OUTPUT In) {
   PS_OUTPUT OUT;
-  OUT.Colour = tex2D(g_texDepth, float2(0, 0));
-  OUT.Colour = 1.0;
+  OUT.Colour = tex2D(s_Texture, In.UV);
   return OUT;
 }
